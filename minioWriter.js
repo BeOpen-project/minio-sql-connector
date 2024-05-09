@@ -42,12 +42,9 @@ module.exports = {
         console.error(error)
       }
 
-      let table = record.s3.bucket.name //"json"
+      let table = record.s3.bucket.name 
 
-      //this.client.query("SELECT * FROM " + table + " WHERE name = '" + record.s3.object.key + "'", (err, res) => {
-      //this.client.query("SELECT * FROM " + table + " WHERE data->>'name' = '" + record.s3.object.key + "';", (err, res) => {
       this.client.query("SELECT * FROM " + table + " WHERE name = '" + record.s3.object.key + "'", (err, res) => {
-        //this.client.query("SELECT * FROM example WHERE data->>'name' = 'source'", (err, res) => {
         if (err) {
           console.error("ERROR searching object in DB");
           console.error(err);
@@ -62,20 +59,16 @@ module.exports = {
               return;
             }
             console.log("Object updated \n", res.rows);
-            //if (res.rows[0])
 
           });
         else
           this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record.s3.object.key}', '${newObject}')`, (err, res) => {
-            //this.client.query(`INSERT INTO '${table}' (data) VALUES ('${newObject}')`, (err, res) => {
             if (err) {
               console.error("ERROR inserting object in DB");
               console.error(err);
               return;
             }
             console.log("Object inserted \n", res.rows);
-            //if (res.rows[0])
-
           });
 
       });
@@ -107,7 +100,6 @@ module.exports = {
         errorMessage = err
         console.error(err)
         return err
-        //return e(err)
       }
 
       let objectData = '';
@@ -130,7 +122,6 @@ module.exports = {
         console.info('Error reading object:')
         errorMessage = err
         console.error(err)
-        //e(err);
       });
 
     });
