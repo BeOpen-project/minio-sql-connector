@@ -1,0 +1,26 @@
+{
+  "name": "sql",
+  "version": "1.0.0",
+  "description": "sql",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "none"
+  },
+  "keywords": [
+    "sql"
+  ],
+  "author": "gabriele percoco",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "minio": "^8.0.0",
+    "nodemon": "^3.1.0",
+    "pg": "^8.11.5"
+  }
+}
