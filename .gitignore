@@ -1,5 +1,11 @@
-node_modules/
-config.js
-docker-compose.yaml
-Esempi query.txt
-docker-compose.yml
+Trino connector/rules.json
+Trino connector/resp.xml
+Trino connector/presto_keystore.jks
+Trino connector/password.db
+Trino connector/minio-realm.json
+Trino connector/minio.yaml
+Trino connector/group.txt
+Trino connector/docker-compose.yaml
+Trino connector/config.properties
+Trino connector/.env
+Trino connector/platform simulator/app.dev.py
