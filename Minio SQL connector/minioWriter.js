@@ -1,9 +1,29 @@
 var Minio = require('minio')
 const { sleep } = require('./common')
 const { minioConfig } = require('./config')
-const Source = require ('./source.js')
+const Source = require('./source.js')
 
 let minioClient = new Minio.Client(minioConfig)
+
+function convertCSVtoJSON(csvData) {
+  const lines = csvData.split('\r\n');
+  const possibleHeaders = [
+    lines[0].trim().split(','),
+    lines[0].trim().split(';')
+  ]
+  const headers = possibleHeaders[0].length > possibleHeaders[1].length ? possibleHeaders[0] : possibleHeaders[1]
+  const results = [];
+
+  for (let i = 1; i < lines.length - 1; i++) {
+    const obj = {};
+    const currentLine = lines[i].trim().split(possibleHeaders[0].length > possibleHeaders[1].length ? "," : ";");
+    for (let j = 0; j < headers.length; j++) 
+      obj[headers[j]] = currentLine[j]?.replace(/['"]/g, '');
+    results.push(obj);
+  }
+  //return results
+  return JSON.stringify(results);
+}
 
 module.exports = {
 
@@ -37,12 +57,16 @@ module.exports = {
       const newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key)
       console.log(record.s3)
       console.log(record)
-      let jsonParsed
+      let jsonParsed, jsonStringified
       try {
         jsonParsed = JSON.parse(newObject)
+        console.log(newObject, "\n", typeof newObject)
       }
       catch (error) {
-        console.error(error)
+        console.error("Not a json")
+        console.error(error.toString())
+        jsonStringified = convertCSVtoJSON(newObject)
+        console.log(jsonStringified, "\n", typeof jsonStringified)
         //jsonParsed = newObject
       }
 
@@ -56,7 +80,7 @@ module.exports = {
         }
         console.log("Objects found \n ", res.rows);
         if (res.rows[0])
-          this.client.query(`UPDATE ${table} SET data = '${newObject}' WHERE name = '${record.s3.object.key}'`, (err, res) => {
+          this.client.query(`UPDATE ${table} SET data = '${jsonStringified || newObject}' WHERE name = '${record.s3.object.key}'`, (err, res) => {
             if (err) {
               console.error("ERROR updating object in DB");
               console.error(err);
@@ -66,7 +90,7 @@ module.exports = {
 
           });
         else
-          this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record.s3.object.key}', '${newObject}')`, (err, res) => {
+          this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record.s3.object.key}', '${jsonStringified || newObject}')`, (err, res) => {
             if (err) {
               console.error("ERROR inserting object in DB");
               console.error(err);
@@ -77,35 +101,36 @@ module.exports = {
 
       });
 
+      jsonParsed = JSON.parse(jsonStringified || newObject)
       jsonParsed.record = record
-      await Source.deleteOne({'record.s3.object.key' : record.s3.object.key})//record.s3.object
+      await Source.deleteOne({ 'record.s3.object.key': record.s3.object.key })//record.s3.object
 
       //---
       //let foundObject = (await Source.find({ 'record.s3.object.key' : record.s3.object.key }))[0]
       //if (foundObject)
       //  await Source.findOneAndReplace({ 'record.s3.object.key': record.s3.object.key }, jsonParsed
-          //format ? 
-          /*
-          {
-            name: record.s3.object.key,
-            source: jsonParsed ? jsonParsed : newObject,
-            bucket: record.s3.bucket.name,
-            timestamp: Date.now()
-          }*/
-          //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
-        //)
+      //format ? 
+      /*
+      {
+        name: record.s3.object.key,
+        source: jsonParsed ? jsonParsed : newObject,
+        bucket: record.s3.bucket.name,
+        timestamp: Date.now()
+      }*/
+      //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
+      //)
       //else
       //---
-        await Source.insertMany([jsonParsed//record.s3.object
-          //format ? 
-          /*{
-            name: record.s3.object.key,
-            source: jsonParsed ? jsonParsed : newObject,
-            bucket: record.s3.bucket.name,
-            timestamp: Date.now()
-          }*/
-          //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
-        ])
+      await Source.insertMany([jsonParsed//record.s3.object
+        //format ? 
+        /*{
+          name: record.s3.object.key,
+          source: jsonParsed ? jsonParsed : newObject,
+          bucket: record.s3.bucket.name,
+          timestamp: Date.now()
+        }*/
+        //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
+      ])
     })
     poller.on('error', (error) => {
       console.error(error)
