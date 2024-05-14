@@ -1,6 +1,7 @@
 var Minio = require('minio')
 const { sleep } = require('./common')
 const { minioConfig } = require('./config')
+const Source = require ('./source.js')
 
 let minioClient = new Minio.Client(minioConfig)
 
@@ -34,15 +35,18 @@ module.exports = {
     poller.on('notification', async (record) => {
       console.info('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size)
       const newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key)
+      console.log(record.s3)
+      console.log(record)
       let jsonParsed
       try {
         jsonParsed = JSON.parse(newObject)
       }
       catch (error) {
         console.error(error)
+        //jsonParsed = newObject
       }
 
-      let table = record.s3.bucket.name 
+      let table = record.s3.bucket.name
 
       this.client.query("SELECT * FROM " + table + " WHERE name = '" + record.s3.object.key + "'", (err, res) => {
         if (err) {
@@ -72,6 +76,36 @@ module.exports = {
           });
 
       });
+
+      jsonParsed.record = record
+      await Source.deleteOne({'record.s3.object.key' : record.s3.object.key})//record.s3.object
+
+      //---
+      //let foundObject = (await Source.find({ 'record.s3.object.key' : record.s3.object.key }))[0]
+      //if (foundObject)
+      //  await Source.findOneAndReplace({ 'record.s3.object.key': record.s3.object.key }, jsonParsed
+          //format ? 
+          /*
+          {
+            name: record.s3.object.key,
+            source: jsonParsed ? jsonParsed : newObject,
+            bucket: record.s3.bucket.name,
+            timestamp: Date.now()
+          }*/
+          //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
+        //)
+      //else
+      //---
+        await Source.insertMany([jsonParsed//record.s3.object
+          //format ? 
+          /*{
+            name: record.s3.object.key,
+            source: jsonParsed ? jsonParsed : newObject,
+            bucket: record.s3.bucket.name,
+            timestamp: Date.now()
+          }*/
+          //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
+        ])
     })
     poller.on('error', (error) => {
       console.error(error)
