@@ -2,6 +2,8 @@ const { Client } = require('pg');
 const { minioConfig, postgreConfig } = require('./config')
 const config = require('./config')
 const minioWriter = require('./minioWriter')
+const common = require('./common')
+const service = require ('./service/service')
 
 const client = new Client(postgreConfig);
 client.connect();
@@ -51,7 +53,7 @@ app.post('/query', async (req, res) => {
 });
 app.get('/query', async (req, res) => {
     console.log(req.query)
-    res.send(await Source.find(req.query))
+    res.send(await service.mongoQuery(req.query))
 });
 app.listen(port, () => {
     console.log(`Server listens on http://localhost:${port}`);
