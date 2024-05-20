@@ -31,6 +31,6 @@ module.exports = {
       },
 
       cleaned (obj){
-        return obj.replace(/['"]/g, '')
+        return JSON.stringify(obj).replace(/['"]/g, '')
       }
 }

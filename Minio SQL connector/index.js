@@ -3,7 +3,7 @@ const { minioConfig, postgreConfig } = require('./config')
 const config = require('./config')
 const minioWriter = require('./minioWriter')
 const common = require('./common')
-const service = require ('./service/service')
+const service = require('./service/service')
 
 const client = new Client(postgreConfig);
 client.connect();
@@ -63,3 +63,14 @@ mongoose
     .then(() => {
         console.log("Connected to mongo")
     })
+
+function sync() {
+    let objects = []
+    for (let bucket of minioWriter.listBuckets())
+        for (let obj of minioWriter.listObjects(bucket))
+            objects.push({ raw: minioWriter.getObject(bucket, obj.name), info: obj })
+    service.save(objects)
+}
+
+//setInterval(sync, config.syncInterval);
+//setInterval(sync, 10000);

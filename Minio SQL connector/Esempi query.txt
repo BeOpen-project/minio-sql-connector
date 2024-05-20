@@ -35,3 +35,8 @@ in index.js, per eseguire query su tutte le tabelle
 
         //client.end();
     });
+	
+	
+query in GET 
+
+localhost:3000/query?format=geojson&coordinates=1.0

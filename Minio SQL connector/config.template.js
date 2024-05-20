@@ -20,5 +20,7 @@ module.exports = {
     database: '',
     password: '',
     port: 5432
-  }
+  },
+  syncInterval :  86400000,
+  mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
 }

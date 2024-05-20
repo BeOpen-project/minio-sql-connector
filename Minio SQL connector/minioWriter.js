@@ -31,103 +31,144 @@ module.exports = {
     })
   },
 
-  getNotifications(bucketName) {
+  async listObjects(bucketName, prefix, recursive) {
+
+
+    let resultMessage
+    let errorMessage
+
+    var data = []
+    var stream = minioClient.listObjects(bucketName, '', true, { IncludeVersion: true })
+    //var stream = minioClient.extensions.listObjectsV2WithMetadata(bucketName, '', true, '')
+    stream.on('data', function (obj) {
+      console.debug(bucketName)
+      console.debug(obj)
+      data.push(obj)
+    })
+    stream.on('end', function (obj) {
+      if (!obj)
+        console.info("ListObjects ended returning an empty object")
+      else
+        console.info("Found object " + JSON.stringify(obj))
+      if (data[0])
+        console.info(JSON.stringify(data))
+      resultMessage = data
+      //process.res.send(data)
+    })
+    stream.on('error', function (err) {
+      console.error(err)
+      errorMessage = err
+    })
+
+    let logCounterFlag
+    while (!errorMessage && !resultMessage) {
+      await sleep(1)
+      if (!logCounterFlag) {
+        logCounterFlag = true
+        sleep(1000).then(resolve => {
+          if (!errorMessage && !resultMessage)
+            console.debug("waiting for list")
+          logCounterFlag = false
+        })
+      }
+    }
+    if (errorMessage)
+      throw errorMessage
+    if (resultMessage)
+      return resultMessage
+  },
+
+  async insertInDBs(newObject, record, align) {
     let csv = false
-    const poller = minioClient.listenBucketNotification(bucketName, '', '', ['s3:ObjectCreated:*'])
-    poller.on('notification', async (record) => {
-      console.info('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size)
-      const newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key)
-      //console.log(record.s3)
-      //console.log(record)
-      let jsonParsed, jsonStringified
+    let jsonParsed, jsonStringified
+    if (typeof newObject != "object")
       try {
+        //jsonParsed = JSON.parse(JSON.stringify(newObject))
+        console.log(typeof newObject, newObject)
         jsonParsed = JSON.parse(newObject)
         console.log("E' un json")
-        //console.log(newObject, "\n", typeof newObject)
       }
       catch (error) {
         console.error("Not a json")
         console.error(error.toString())
         jsonStringified = common.convertCSVtoJSON(newObject)
-        //console.log(jsonStringified, "\n", typeof jsonStringified)
         csv = true
-        //jsonParsed = newObject
       }
+    else
+      jsonParsed = newObject
 
-      let table = record.s3.bucket.name
+    let table = record?.s3?.bucket?.name || record.bucket
 
-      this.client.query("SELECT * FROM " + table + " WHERE name = '" + record.s3.object.key + "'", (err, res) => {
-        if (err) {
-          console.error("ERROR searching object in DB");
-          console.error(err);
-          return;
-        }
-        console.log("Objects found \n ", res.rows);
-        if (res.rows[0])
-          this.client.query(`UPDATE ${table} SET data = '${jsonStringified || common.cleaned(newObject)}' WHERE name = '${record.s3.object.key}'`, (err, res) => {
-            if (err) {
-              console.error("ERROR updating object in DB");
-              console.error(err);
-              return;
-            }
-            //console.log("Object updated \n", res.rows);
-            console.log("Object updated \n");
+    console.debug(record?.s3?.object)
 
-          });
-        else
-          this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record.s3.object.key}', '${jsonStringified || common.cleaned(newObject)}')`, (err, res) => {
-            if (err) {
-              console.error("ERROR inserting object in DB");
-              console.error(err);
-              return;
-            }
-            console.log("Object inserted \n");
+    this.client.query("SELECT * FROM " + table + " WHERE name = '" + (record?.s3?.object?.key || record.key) + "'", (err, res) => {
+      if (err) {
+        console.error("ERROR searching object in DB");
+        console.error(err);
+        return;
+      }
+      console.log("Objects found \n ", res.rows);
+      if (res.rows[0])
+        this.client.query(`UPDATE ${table} SET data = '${jsonStringified || common.cleaned(newObject)}' WHERE name = '${record?.s3?.object?.key || record.key}'`, (err, res) => {
+          if (err) {
+            console.error("ERROR updating object in DB");
+            console.error(err);
+            return;
+          }
+          console.log("Object updated \n");
 
-            //console.log("Object inserted \n", res.rows);
-          });
+        });
+      else
+        this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record?.s3?.object?.key || record.key}', '${jsonStringified || common.cleaned(newObject)}')`, (err, res) => {
+          if (err) {
+            console.error("ERROR inserting object in DB");
+            console.error(err);
+            return;
+          }
+          console.log("Object inserted \n");
+        });
 
-      });
+    });
 
-      jsonParsed = JSON.parse(jsonStringified || newObject)
-      jsonParsed.record = record
+    //jsonParsed = JSON.parse(JSON.stringify(jsonStringified || newObject))
+    if ((!jsonParsed) || (jsonParsed && typeof jsonParsed != "object"))
       try {
-        await Source.deleteOne({ 'record.s3.object.key': record.s3.object.key })//record.s3.object
+        jsonParsed = JSON.parse(jsonStringified || newObject)
       }
       catch (error) {
         console.error(error)
       }
 
-      //---
-      //let foundObject = (await Source.find({ 'record.s3.object.key' : record.s3.object.key }))[0]
-      //if (foundObject)
-      //  await Source.findOneAndReplace({ 'record.s3.object.key': record.s3.object.key }, jsonParsed
-      //format ? 
-      /*
-      {
-        name: record.s3.object.key,
-        source: jsonParsed ? jsonParsed : newObject,
-        bucket: record.s3.bucket.name,
-        timestamp: Date.now()
-      }*/
-      //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
-      //)
-      //else
-      //---
-      try {
-        await Source.insertMany([csv ? { csv: jsonParsed } : Array.isArray(jsonParsed) ? {json : jsonParsed} : jsonParsed//record.s3.object
-          //format ? 
-          /*{
-            name: record.s3.object.key,
-            source: jsonParsed ? jsonParsed : newObject,
-            bucket: record.s3.bucket.name,
-            timestamp: Date.now()
-          }*/
-          //: { name: record.s3.object.key, sourceCSV: newObject, bucket: record.s3.bucket.name, from: "minio", timestamp: new Number(Date.now()) }
-        ])
-      }
-      catch (error) {
-        console.error(error)
-      }
+    try {
+      await Source.deleteOne({ 'record.s3.object.key': record?.s3?.object?.key || record.key })//record.s3.object
+    }
+    catch (error) {
+      console.error(error)
+    }
+
+    let name = record?.s3?.object?.key || record.key
+    name = name.split(".")
+    let extension = name.pop()
+    console.debug(extension)
+
+    try {
+      await Source.insertMany([extension == "csv" ? { csv: jsonParsed, record } : Array.isArray(jsonParsed) ? { json: jsonParsed, record } : { ...jsonParsed, ...record }])
+    }
+    catch (error) {
+      console.error(error)
+    }
+  },
+
+  getNotifications(bucketName) {
+
+    const poller = minioClient.listenBucketNotification(bucketName, '', '', ['s3:ObjectCreated:*'])
+    poller.on('notification', async (record) => {
+      console.info('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size)
+      const newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
+      console.log(newObject, typeof newObject)
+      //console.log(record.s3)
+      //console.log(record)
+      await this.insertInDBs(newObject, record)
     })
     poller.on('error', (error) => {
       console.error(error)
@@ -166,10 +207,13 @@ module.exports = {
       dataStream.on('end', function () {
         console.info('Object data: ', objectData);
         try {
+          //resultMessage = format == 'json' ? JSON.parse(JSON.stringify(objectData)) : objectData
           resultMessage = format == 'json' ? JSON.parse(objectData) : objectData
+          console.log("Json parsato")
+
         }
         catch (error) {
-          console.error(error)
+          console.error("Non era un json ? \n", error)
           resultMessage = format == 'json' ? [{ data: objectData }] : objectData
         }
       });
