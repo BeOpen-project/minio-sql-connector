@@ -1,5 +1,4 @@
 ﻿
-
 module.exports = {
   
     sleep(ms) {
@@ -31,6 +30,10 @@ module.exports = {
       },
 
       cleaned (obj){
-        return JSON.stringify(obj).replace(/['"]/g, '')
+        console.debug("CLEAN")
+        console.debug(typeof obj != "string" ? JSON.stringify(obj) : obj)
+        //return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"\r\n\s]/g, '');
+
+        return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"]/g, '');
       }
 }

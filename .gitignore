@@ -9,3 +9,4 @@ Trino connector/docker-compose.yaml
 Trino connector/config.properties
 Trino connector/.env
 Trino connector/platform simulator/app.dev.py
+Minio SQL connector/log.txt

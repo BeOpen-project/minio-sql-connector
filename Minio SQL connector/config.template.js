@@ -23,4 +23,15 @@ module.exports = {
   },
   syncInterval :  86400000,
   mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
+  authConfig: {
+    idmHost: "https://platform.beopen-dep.it/auth",
+    clientId: "",
+    userInfoEndpoint: "https://platform.beopen-dep.it/api/user",//"http://localhost:5500/api/mockGetUser",
+    //disableAuth: true,
+    authProfile: "oidc",
+    authRealm: "",
+    introspect: false,
+    publicKey: "",
+    secret: "" // don't push it
+},
 }

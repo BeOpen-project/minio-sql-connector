@@ -1,6 +1,48 @@
-const Source = require('../source')
-const common = require('../common')
-const minioWriter = require ("../minioWriter")
+const Source = require('../models/source')
+const common = require('../../utils/common')
+const { Client } = require('pg');
+const { minioConfig, postgreConfig } = require('../../config')
+const minioWriter = require("../../utils/minioWriter")
+const client = new Client(postgreConfig);
+client.connect();
+minioWriter.client = client
+if (minioConfig.subscribe.all)
+    minioWriter.listBuckets().then((buckets) => {
+        let a = 1
+        for (let bucket of buckets) {
+            console.debug("Bucket name : " + bucket.name.toString())
+            //minioWriter.subscribe(bucket.name.toString())
+            //minioWriter.setNotifications(bucket.name.toString())
+            minioWriter.getNotifications(bucket.name.toString())
+            console.debug("Subscribed bucket " + (a++) + " of " + buckets.length)
+        }
+    })
+else
+    for (let bucket of minioConfig.subscribe.buckets)
+        minioWriter.getNotifications(bucket)
+
+let syncing
+
+async function save(objects){
+    for (let obj of objects)
+        await minioWriter.insertInDBs(obj.raw, obj.info, true)
+}
+
+async function sync() {
+    if (!syncing) {
+        syncing = true
+        let objects = []
+        console.debug(await minioWriter.listBuckets())
+        for (let bucket of await minioWriter.listBuckets())
+            for (let obj of await minioWriter.listObjects(bucket.name))
+                objects.push({ raw: await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop()), info: {...obj, bucketName : bucket.name} })
+        await save(objects)
+        syncing = false
+    }
+    else console.log("Syncing not finished")
+}
+
+//setInterval(sync, 10000);
 
 module.exports = {
 
@@ -14,7 +56,7 @@ module.exports = {
     },
 
     async save0(objects) {
-        
+
         await Source.deleteMany({ "record.s3.bucket.name": bucket })
         // TRUNCATE TABLE users;
         this.client.query("TRUNCATE TABLE " + bucket, (err, res) => {
@@ -42,7 +84,7 @@ module.exports = {
     async save(objects) {
         for (let obj of objects)
             await minioWriter.insertInDBs(obj.raw, obj.info, true)
-            //await Source.findOneAndUpdate({"record.s3.object.key" : obj.record.s3.object.key}, obj)
+        //await Source.findOneAndUpdate({"record.s3.object.key" : obj.record.s3.object.key}, obj)
     },
 
     async exampleQueryJson(query) {
@@ -82,15 +124,30 @@ module.exports = {
         })
     },
 
-    async mongoQuery(query) {
+    async mongoQuery(query, prefix) {
         let format = query.format?.toLowerCase()
         if (format)
             delete query["format"]
+        query.name = new RegExp("^" + prefix, 'i')
         switch (format) {
             case "geojson": return await this.exampleQueryGeoJson(query)
             case "csv": return await this.exampleQueryCSV(query)
             case "json": return this.exampleQueryJson(query)
             case "object": return await Source.find(query)
+            default: return await Source.find(query)
         }
+    },
+
+    querySQL() {
+        client.query(requestData, (err, res) => {
+            if (err) {
+                console.error("ERROR");
+                console.error(err);
+                res.status(500).json(err.toString())
+                return;
+            }
+            console.log(res.rows);
+            res.send(res.rows)
+        });
     }
 }
