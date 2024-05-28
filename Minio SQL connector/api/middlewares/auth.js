@@ -67,13 +67,13 @@ module.exports = {
                                 next();
                             } else {
                                 console.error('Token not valid.');
-                                res.sendStatus(403);
+                                return res.sendStatus(403);
                             }
                         })
                         .catch(error => {
                             console.error(error.response.data)
                             console.error('Errore during token verify:', error.message);
-                            res.sendStatus(500);
+                            return res.sendStatus(500);
                         });
                 }
                 else {
@@ -83,16 +83,11 @@ module.exports = {
                     if ((decodedToken.azp == authConfig.clientId) && ((decodedToken.exp * 1000) > Date.now())) {
 
                         try {
-                            if (common.isMinioWriterActive()) {
-                                let data = (await axios.get(config.authConfig.userInfoEndpoint, { headers: { "Authorization": authHeader } })).data
-                                let { pilot, username, email } = data
-                                config.orionWriter.fiwareService = req.body.bucketName = pilot.toLowerCase() //+ "/" + email + "/" + config.minioWriter.defaultInputFolderName//{pilot, email}
-                                req.body.prefix = (email || username) + "/" + config.minioWriter.defaultInputFolderName
-                                config.group = email || username
-                                config.orionWriter.fiwareServicePath = "/" + pilot.toLowerCase()
-                            }
-                            else
-                                req.body.prefix = decodedToken.email
+                            let data = (await axios.get(config.authConfig.userInfoEndpoint, { headers: { "Authorization": authHeader } })).data
+                            let { pilot, username, email } = data
+                            req.body.bucketName = pilot.toLowerCase() //+ "/" + email + "/" + config.minioWriter.defaultInputFolderName//{pilot, email}
+                            req.body.prefix = (email || username) + "/" + config.minioWriter.defaultInputFolderName
+                            config.group = email || username
                             console.debug(req.body.prefix)
                         }
                         catch (error) {
@@ -107,26 +102,32 @@ module.exports = {
                         //if (req.params.bucketName && req.params.objectName)
                         //    console.debug(req.body.bucketName , req.params.bucketName , req.body.prefix , req.params.objectName.split("/")[0] + "/" + req.params.objectName.split("/")[1])
                         let deniedQuery, query
-                        if (req.body.query){
-                            query = req.body.query.split("FROM ")
-                            query = query[1].split(" ")
-                            if (query[0] != req.body.bucketName)
-                                deniedQuery = true
-                            query = req.body.query.split("name = '")[1]
-                            if (!query.startsWith(req.body.prefix))
-                                deniedQuery = true
-                        }
-                        if (!deniedQuery)
+                        try {
+                            if (req.body.query) {
+                                query = req.body.query.split("FROM ")
+                                query = query[1].split(" ")
+                                if (query[0] != req.body.bucketName)
+                                    deniedQuery = true
+                                query = req.body.query.split("name = '")[1]
+                                if (!query.startsWith(req.body.prefix))
+                                    deniedQuery = true
+                            }
+                            //if (!deniedQuery)
                             next()
-                        else 
-                            res.status(403).send("Available bucketname is " + req.body.bucketName + " and you tried to access " + req.body.query.split("FROM ")[1].split(" ") + ".\nAvailable prefix is " + req.body.prefix + " and you tried to access this object " + req.body.query.split("name = '")[1].split("'"));
+                            //else 
+                            //    res.status(403).send("Available bucketname is " + req.body.bucketName + " and you tried to access " + req.body.query.split("FROM ")[1].split(" ") + ".\nAvailable prefix is " + req.body.prefix + " and you tried to access this object " + req.body.query.split("name = '")[1].split("'"));
+                        }
+                        catch (error) {
+                            console.error(error)
+                            next()
+                        }
                     }
                     else
-                        res.sendStatus(403);
+                        return res.sendStatus(403);
                 }
             }
             else
-                res.sendStatus(401);
+                return res.sendStatus(401);
         }
     }
 };

@@ -23,7 +23,7 @@ else
 
 let syncing
 
-async function save(objects){
+async function save(objects) {
     for (let obj of objects)
         await minioWriter.insertInDBs(obj.raw, obj.info, true)
 }
@@ -35,14 +35,15 @@ async function sync() {
         console.debug(await minioWriter.listBuckets())
         for (let bucket of await minioWriter.listBuckets())
             for (let obj of await minioWriter.listObjects(bucket.name))
-                objects.push({ raw: await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop()), info: {...obj, bucketName : bucket.name} })
+                objects.push({ raw: await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop()), info: { ...obj, bucketName: bucket.name } })
         await save(objects)
         syncing = false
     }
     else console.log("Syncing not finished")
 }
 
-//setInterval(sync, 10000);
+sync()
+setInterval(sync, 3600000);
 
 module.exports = {
 
@@ -138,16 +139,17 @@ module.exports = {
         }
     },
 
-    querySQL() {
-        client.query(requestData, (err, res) => {
+    querySQL(response, query, prefix) {
+        client.query(query, (err, res) => {
             if (err) {
                 console.error("ERROR");
                 console.error(err);
-                res.status(500).json(err.toString())
+                response.status(500).json(err.toString())
                 return;
             }
+            else
+                response.send(res.rows)
             console.log(res.rows);
-            res.send(res.rows)
         });
     }
 }

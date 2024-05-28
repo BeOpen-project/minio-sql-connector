@@ -130,7 +130,6 @@ module.exports = {
       if (err) {
         log("ERROR searching object in DB");
         log(err);
-        porco
         return;
       }
       log("Objects found \n ", res.rows);
