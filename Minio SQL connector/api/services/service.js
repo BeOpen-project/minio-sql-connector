@@ -125,7 +125,22 @@ module.exports = {
         })
     },
 
-    async mongoQuery(query, prefix) {
+    async simpleQuery(query) {
+        let result = await Source.find(query)
+        for (let obj of result) {
+            obj.fileName = obj.name.split("/")[2]
+            obj.path = obj.name
+            obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
+            console.debug(obj.path)
+        }
+        return result
+    },
+
+    //fileName
+    //path 
+    //fileType
+
+    async mongoQuery(query, prefix, bucket) {
         let format = query.format?.toLowerCase()
         if (format)
             delete query["format"]
@@ -134,12 +149,21 @@ module.exports = {
             case "geojson": return await this.exampleQueryGeoJson(query)
             case "csv": return await this.exampleQueryCSV(query)
             case "json": return this.exampleQueryJson(query)
-            case "object": return await Source.find(query)
-            default: return await Source.find(query)
+            case "object": return this.simpleQuery(query)
+            default: return await this.simpleQuery(query)
         }
     },
 
-    querySQL(response, query, prefix) {
+    async rawQuery(query, prefix, bucket) {
+        query.name = new RegExp("^" + prefix, 'i')
+        let objects = []
+        for (let obj of await minioWriter.listObjects(bucket))
+            objects.push({ raw: await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop()), record: { ...obj, bucketName: bucket.name } })
+        return objects.filter(obj => typeof obj.raw == "string" ? obj.record.name.includes(prefix) && obj.raw.includes(query.value) : obj.record.name.includes(prefix) && JSON.stringify(obj.raw).includes(query.value) )
+    },
+
+
+    querySQL(response, query, prefix, bucket) {
         client.query(query, (err, res) => {
             if (err) {
                 console.error("ERROR");
@@ -148,7 +172,7 @@ module.exports = {
                 return;
             }
             else
-                response.send(res.rows)
+                response.send(res.rows.filter(item => item.name.includes(prefix)))
             console.log(res.rows);
         });
     }

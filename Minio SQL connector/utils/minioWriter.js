@@ -16,9 +16,9 @@ function log(...m) {
   let args = [...m]
   for (let arg of args)
     if (arg && (Array.isArray(arg) || typeof arg == "object"))
-      logStream.write(JSON.stringify(arg) + '\n'); 
-    else 
-    logStream.write(arg + '\n'); 
+      logStream.write(JSON.stringify(arg) + '\n');
+    else
+      logStream.write(arg + '\n');
 }
 
 module.exports = {
@@ -130,6 +130,24 @@ module.exports = {
       if (err) {
         log("ERROR searching object in DB");
         log(err);
+        // CREATE TABLE nome-bucket (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)
+        this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)", (err, res) => {
+          if (err) {
+            log("ERROR creating table");
+            log(err);
+            return;
+          }
+          log(res)
+          this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}')`, (err, res) => {
+            if (err) {
+              log("ERROR inserting object in DB");
+              log(err);
+              return;
+            }
+            log("Object inserted \n");
+          });
+
+        });
         return;
       }
       log("Objects found \n ", res.rows);
