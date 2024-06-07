@@ -10,6 +10,24 @@ const fs = require('fs');
 const logFile = 'log.txt';
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
+function logSizeChecker() {
+  let stats = fs.statSync(logFile)
+  let fileSizeInBytes = stats.size;
+  // Convert the file size to megabytes (optional)
+  let fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
+  log("Log size is ", fileSizeInMegabytes)
+  if (fileSizeInMegabytes > 50)
+    fs.writeFile(logFile, "", err => {
+      if (err) {
+        console.error(err);
+      } else {
+        log("Log reset")
+      }
+    });
+}
+
+setInterval(logSizeChecker, 3600000);
+
 function log(...m) {
   console.log(...m)
   //logs.push(m)
@@ -57,16 +75,16 @@ module.exports = {
     //var stream = minioClient.extensions.listObjectsV2WithMetadata(bucketName, '', true, '')
     stream.on('data', function (obj) {
       log(bucketName)
-      log(obj)
+      log(common.minify(obj))
       data.push(obj)
     })
     stream.on('end', function (obj) {
       if (!obj)
         log("ListObjects ended returning an empty object")
       else
-        log("Found object " + JSON.stringify(obj))
+        log("Found object " + common.minify(JSON.stringify(obj)))
       if (data[0])
-        log(JSON.stringify(data))
+        log(common.minify(JSON.stringify(data)))
       resultMessage = data
       //process.res.send(data)
     })
@@ -99,7 +117,7 @@ module.exports = {
     if (typeof newObject != "object")
       try {
         //jsonParsed = JSON.parse(JSON.stringify(newObject))
-        log("New object\n", newObject, "\ntype : ", typeof newObject)
+        log("New object\n", common.minify(newObject), "\ntype : ", typeof newObject)
         jsonParsed = JSON.parse(newObject)
         log("Adesso è un json")
       }
@@ -117,11 +135,10 @@ module.exports = {
     }
 
     let table = record?.s3?.bucket?.name || record.bucketName
-    console.log(record)
-    //porco
+    log(record)
 
-    log("before postgre query", record?.s3?.object)
-    log("before postgre query", JSON.stringify(jsonStringified || common.cleaned(newObject)))
+    log("before postgre query", common.minify(record?.s3?.object))
+    log("before postgre query", common.minify(JSON.stringify(jsonStringified || common.cleaned(newObject))))
     let queryName = record?.s3?.object?.key || record.name
     log("QUERY NAME", queryName)
     //queryName.replace(/ /g, '');
@@ -137,7 +154,7 @@ module.exports = {
             log(err);
             return;
           }
-          log(res)
+          log(common.minify(res))
           this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}')`, (err, res) => {
             if (err) {
               log("ERROR inserting object in DB");
@@ -150,7 +167,7 @@ module.exports = {
         });
         return;
       }
-      log("Objects found \n ", res.rows);
+      log("Objects found \n ", common.minify(res.rows));
       if (res.rows[0])
         this.client.query(`UPDATE ${table} SET data = '${JSON.stringify(jsonStringified || common.cleaned(newObject))}' WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
           if (err) {
@@ -200,10 +217,10 @@ module.exports = {
     log("Extension ", extension)
     log("E' un array : ", Array.isArray(jsonParsed))
     log("Type ", typeof jsonParsed)
-    log("Il file è questo \n", jsonParsed)
+    log("Il file è questo \n", common.minify(jsonParsed))
     log("Ecco i dettagli \n", record)
     if (!jsonParsed)
-      log("EMPTYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
+      log("Empty object of extension ", extension)
 
     try {
       await Source.insertMany([extension == "csv" ? { csv: jsonParsed, record, name: record?.s3?.object?.key || record.name } : Array.isArray(jsonParsed) ? { json: jsonParsed, record, name: record?.s3?.object?.key || record.name } : typeof jsonParsed == "object" ? { ...jsonParsed, record, name: record?.s3?.object?.key || record.name } : { raw: jsonParsed, record, name: record?.s3?.object?.key || record.name }])
@@ -225,7 +242,7 @@ module.exports = {
     poller.on('notification', async (record) => {
       log('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size)
       const newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
-      log("New object\n", newObject, "\ntype : ", typeof newObject)
+      log("New object\n", common.minify(newObject), "\ntype : ", typeof newObject)
       //log(record.s3)
       //log(record)
       await this.insertInDBs(newObject, record, false)
@@ -265,7 +282,7 @@ module.exports = {
       });
 
       dataStream.on('end', function () {
-        log('Object data: ', objectData);
+        log('Object data: ', common.minify(objectData));
         try {
           //resultMessage = format == 'json' ? JSON.parse(JSON.stringify(objectData)) : objectData
           resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData) : objectData
