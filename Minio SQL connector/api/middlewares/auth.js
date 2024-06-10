@@ -24,6 +24,9 @@ module.exports = {
         if (!req.headers.visibility)
             req.headers.visibility = "private"
 
+        if (req.headers.visibility == "public" && req?.body?.query && !req?.body?.query?.toLowerCase().includes("public-data"))
+            return res.status(400).send("If you are requesting for public files you must search in public-data bucket");
+
         if (authConfig.disableAuth)
             next()
         else {

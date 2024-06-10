@@ -19,6 +19,10 @@ module.exports = {
     }
   },
 
+  urlEncode(bucket){
+    return bucket.replaceAll("-", "")
+  },
+
   convertCSVtoJSON(csvData) {
     console.debug(this.minify(csvData))
     const lines = csvData.split('\r\n');

@@ -134,7 +134,7 @@ module.exports = {
       jsonParsed = newObject
     }
 
-    let table = record?.s3?.bucket?.name || record.bucketName
+    let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
     log(record)
 
     log("before postgre query", common.minify(record?.s3?.object))
@@ -148,14 +148,14 @@ module.exports = {
         log("ERROR searching object in DB");
         log(err);
         // CREATE TABLE nome-bucket (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)
-        this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)", (err, res) => {
+        this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB, record JSONB)", (err, res) => {
           if (err) {
             log("ERROR creating table");
             log(err);
             return;
           }
           log(common.minify(res))
-          this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}')`, (err, res) => {
+          this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}')`, (err, res) => {
             if (err) {
               log("ERROR inserting object in DB");
               log(err);

@@ -45,14 +45,19 @@ async function sync() {
 sync()
 setInterval(sync, 3600000);
 
+function bucketIs(record, bucket) {
+    return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
+}
+
 function objectFilter(obj, prefix, bucket, visibility) {
-    if (visibility == "private" && (obj.record?.name.includes(prefix) || obj.name.includes(prefix))){
-        console.debug(true)
+    console.debug(obj, prefix, bucket, visibility)
+    if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj.name.includes(prefix))) {
+        //console.debug(true)
         return true
     }
-    if (visibility == "shared" && obj.record.bucketName == bucket && obj.name.includes("/" + bucket + " SHARED Data/"))
+    if (visibility == "shared" && bucketIs(obj.record, bucket) && obj.name.includes(bucket.toUpperCase() + " SHARED Data/"))
         return true
-    if (visibility == "public" && obj.record.bucketName == "public-data")
+    if (visibility == "public" && bucketIs(obj.record, "public-data"))
         return true
     return false
 
@@ -167,17 +172,17 @@ module.exports = {
         }
     },
 
-    async rawQuery(query, prefix, bucket,visibility) {
+    async rawQuery(query, prefix, bucket, visibility) {
         //query.name = new RegExp("^" + prefix, 'i')
         let objects = []
         for (let obj of await minioWriter.listObjects(bucket))
-            objects.push({ raw: await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop()), record: { ...obj, bucketName: bucket.name } })
+            objects.push({ raw: await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop()), record: { ...obj, bucketName: bucket }, name : obj.name })
         return objects.filter(obj => typeof obj.raw == "string" ? objectFilter(obj, prefix, bucket, visibility) && obj.raw.includes(query.value) : objectFilter(obj, prefix, bucket, visibility) && JSON.stringify(obj.raw).includes(query.value))
         //return objects.filter(obj => typeof obj.raw == "string" ? obj.record.name.includes(prefix) && obj.raw.includes(query.value) : obj.record.name.includes(prefix) && JSON.stringify(obj.raw).includes(query.value))
     },
 
 
-    querySQL(response, query, prefix, bucket,visibility) {
+    querySQL(response, query, prefix, bucket, visibility) {
         client.query(query, (err, res) => {
             if (err) {
                 console.error("ERROR");
@@ -185,9 +190,12 @@ module.exports = {
                 response.status(500).json(err.toString())
                 return;
             }
-            else
+            else {
+                //if (visibility == "shared")
+                //    prefix = bucket + " " 
                 response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)))
-            console.log(res.rows);
+                console.log(res.rows);
+            }
         });
     }
 }
