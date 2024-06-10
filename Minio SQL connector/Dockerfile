@@ -1,5 +1,6 @@
 FROM node:16-alpine
 WORKDIR /app
-COPY ./Minio-SQL-Connector/* ./* 
+COPY . . 
+WORKDIR /Minio-SQL-Connector
 RUN npm install
 CMD ["node", "index"]
