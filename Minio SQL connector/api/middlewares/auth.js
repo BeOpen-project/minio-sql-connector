@@ -21,6 +21,9 @@ module.exports = {
         if (req.body.file)
             req.body = JSON.parse(req.body.file)
 
+        if (!req.headers.visibility)
+            req.headers.visibility = "private"
+
         if (authConfig.disableAuth)
             next()
         else {
@@ -85,8 +88,8 @@ module.exports = {
                         try {
                             let data = (await axios.get(config.authConfig.userInfoEndpoint, { headers: { "Authorization": authHeader } })).data
                             let { pilot, username, email } = data
-                            req.body.bucketName = pilot.toLowerCase() //+ "/" + email + "/" + config.minioWriter.defaultInputFolderName//{pilot, email}
-                            req.body.prefix = (email || username) + "/" + config.minioWriter.defaultInputFolderName
+                            req.body.bucketName = pilot.toLowerCase() //+ "/" + email + "/" + config.minioConfig.defaultInputFolderName//{pilot, email}
+                            req.body.prefix = (email || username) + "/" + config.minioConfig.defaultInputFolderName
                             config.group = email || username
                             console.debug(req.body.prefix)
                         }

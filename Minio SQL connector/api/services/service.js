@@ -45,6 +45,19 @@ async function sync() {
 sync()
 setInterval(sync, 3600000);
 
+function objectFilter(obj, prefix, bucket, visibility) {
+    if (visibility == "private" && (obj.record?.name.includes(prefix) || obj.name.includes(prefix))){
+        console.debug(true)
+        return true
+    }
+    if (visibility == "shared" && obj.record.bucketName == bucket && obj.name.includes("/" + bucket + " SHARED Data/"))
+        return true
+    if (visibility == "public" && obj.record.bucketName == "public-data")
+        return true
+    return false
+
+}
+
 module.exports = {
 
     async exampleQueryCSV(query) {
@@ -140,30 +153,31 @@ module.exports = {
     //path 
     //fileType
 
-    async mongoQuery(query, prefix, bucket) {
+    async mongoQuery(query, prefix, bucket, visibility) {
         let format = query.format?.toLowerCase()
         if (format)
             delete query["format"]
-        query.name = new RegExp("^" + prefix, 'i')
+        //query.name = new RegExp("^" + prefix, 'i')
         switch (format) {
-            case "geojson": return await this.exampleQueryGeoJson(query)
-            case "csv": return await this.exampleQueryCSV(query)
-            case "json": return this.exampleQueryJson(query)
-            case "object": return this.simpleQuery(query)
-            default: return await this.simpleQuery(query)
+            case "geojson": return (await this.exampleQueryGeoJson(query)).filter(obj => objectFilter(obj, prefix, bucket, visibility))//obj.name.includes(prefix))
+            case "csv": return (await this.exampleQueryCSV(query)).filter(obj => objectFilter(obj, prefix, bucket, visibility))
+            case "json": return (await this.exampleQueryJson(query)).filter(obj => objectFilter(obj, prefix, bucket, visibility))
+            case "object": return (await this.simpleQuery(query)).filter(obj => objectFilter(obj, prefix, bucket, visibility))
+            default: return (await this.simpleQuery(query)).filter(obj => objectFilter(obj, prefix, bucket, visibility))
         }
     },
 
-    async rawQuery(query, prefix, bucket) {
-        query.name = new RegExp("^" + prefix, 'i')
+    async rawQuery(query, prefix, bucket,visibility) {
+        //query.name = new RegExp("^" + prefix, 'i')
         let objects = []
         for (let obj of await minioWriter.listObjects(bucket))
             objects.push({ raw: await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop()), record: { ...obj, bucketName: bucket.name } })
-        return objects.filter(obj => typeof obj.raw == "string" ? obj.record.name.includes(prefix) && obj.raw.includes(query.value) : obj.record.name.includes(prefix) && JSON.stringify(obj.raw).includes(query.value) )
+        return objects.filter(obj => typeof obj.raw == "string" ? objectFilter(obj, prefix, bucket, visibility) && obj.raw.includes(query.value) : objectFilter(obj, prefix, bucket, visibility) && JSON.stringify(obj.raw).includes(query.value))
+        //return objects.filter(obj => typeof obj.raw == "string" ? obj.record.name.includes(prefix) && obj.raw.includes(query.value) : obj.record.name.includes(prefix) && JSON.stringify(obj.raw).includes(query.value))
     },
 
 
-    querySQL(response, query, prefix, bucket) {
+    querySQL(response, query, prefix, bucket,visibility) {
         client.query(query, (err, res) => {
             if (err) {
                 console.error("ERROR");
@@ -172,7 +186,7 @@ module.exports = {
                 return;
             }
             else
-                response.send(res.rows.filter(item => item.name.includes(prefix)))
+                response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)))
             console.log(res.rows);
         });
     }
