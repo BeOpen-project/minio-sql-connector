@@ -241,7 +241,13 @@ module.exports = {
     const poller = minioClient.listenBucketNotification(bucketName, '', '', ['s3:ObjectCreated:*'])
     poller.on('notification', async (record) => {
       log('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size)
-      const newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
+      try {
+        const newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
+      }
+      catch (error) {
+        console.error(error)
+        return
+      }
       log("New object\n", common.minify(newObject), "\ntype : ", typeof newObject)
       //log(record.s3)
       //log(record)
