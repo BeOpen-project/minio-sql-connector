@@ -53,6 +53,7 @@ async function sync() {
                 index++
             }
             bucketIndex++;
+            console.debug("Bucket ", bucketIndex, " of ", buckets.length, " scanning done")
         }
         await save(objects)
         syncing = false
@@ -67,8 +68,11 @@ function bucketIs(record, bucket) {
     return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
 }
 
+let objectFilterCalls = 0
+
 function objectFilter(obj, prefix, bucket, visibility) {
-    console.debug(obj, prefix, bucket, visibility)
+    //console.debug(obj, prefix, bucket, visibility)
+    console.debug(++objectFilterCalls)
     if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj.name.includes(prefix))) {
         //console.debug(true)
         return true
@@ -213,6 +217,7 @@ module.exports = {
                 console.error("ERROR");
                 console.error(err);
                 response.status(500).json(err.toString())
+                console.log("Query sql finished with errors")
                 return;
             }
             else {
@@ -220,6 +225,7 @@ module.exports = {
                 //    prefix = bucket + " " 
                 response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)))
                 console.log(res.rows);
+                console.log("Query sql finished")
             }
         });
     }

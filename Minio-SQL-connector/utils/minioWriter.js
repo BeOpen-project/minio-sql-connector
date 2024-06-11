@@ -297,11 +297,11 @@ module.exports = {
       });
 
       dataStream.on('end', function () {
-        log('Object data: ')//, common.minify(objectData));
+        //log('Object data: ', common.minify(objectData));
         try {
           //resultMessage = format == 'json' ? JSON.parse(JSON.stringify(objectData)) : objectData
           resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData) : objectData
-          log("Json parsato")
+        //  log("Json parsato")
 
         }
         catch (error) {
@@ -309,11 +309,11 @@ module.exports = {
           try {
             //resultMessage = format == 'json' ? JSON.parse(JSON.stringify(objectData)) : objectData
             resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData.substring(1)) : objectData
-            log("Json parsato")
+            //log("Json parsato")
 
           }
           catch (error) {
-            log("Non era un json ? \n", error)
+            //log("Non era un json ? \n", error)
             resultMessage = format == 'json' ? [{ data: objectData }] : objectData
           }
         }
