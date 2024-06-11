@@ -1,5 +1,6 @@
 const Source = require('../models/source')
 const common = require('../../utils/common')
+const { sleep } = require('../../utils/common')
 const { Client } = require('pg');
 const { minioConfig, postgreConfig } = require('../../config')
 const minioWriter = require("../../utils/minioWriter")
@@ -36,6 +37,7 @@ async function sync() {
         for (let bucket of await minioWriter.listBuckets())
             for (let obj of await minioWriter.listObjects(bucket.name)) {
                 try {
+                    await sleep(100)
                     let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                     objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                 }
@@ -50,7 +52,7 @@ async function sync() {
 }
 
 sync()
-setInterval(sync, 3600000);
+//setInterval(sync, 3600000);
 
 function bucketIs(record, bucket) {
     return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
