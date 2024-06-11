@@ -33,18 +33,27 @@ async function sync() {
     if (!syncing) {
         syncing = true
         let objects = []
-        console.debug(await minioWriter.listBuckets())
-        for (let bucket of await minioWriter.listBuckets())
-            for (let obj of await minioWriter.listObjects(bucket.name)) {
+        let buckets = await minioWriter.listBuckets()
+        console.debug(buckets)
+        let bucketIndex = 1
+        for (let bucket of buckets){
+            let bucketObjects =  await minioWriter.listObjects(bucket.name)
+            let index = 1
+            for (let obj of bucketObjects) {
                 try {
                     await sleep(100)
+                    console.debug("Bucket ", bucketIndex, " of ", buckets.length)
+                    console.debug("Getting object ", index, " of ", bucketObjects.length)
                     let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                     objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                 }
                 catch (error) {
                     console.error(error)
                 }
+                index++
             }
+            bucketIndex++;
+        }
         await save(objects)
         syncing = false
     }
