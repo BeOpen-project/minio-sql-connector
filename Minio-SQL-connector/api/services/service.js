@@ -44,17 +44,15 @@ async function sync() {
                 try {
                     await sleep(100)
                     console.debug("Bucket ", bucketIndex, " of ", buckets.length)
-                    console.debug("Getting object ", index, " of ", bucketObjects.length)
+                    console.debug("Getting object ", index++, " of ", bucketObjects.length)
                     let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                     objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                 }
                 catch (error) {
                     console.error(error)
                 }
-                index++
             }
-            bucketIndex++;
-            console.debug("Bucket ", bucketIndex, " of ", buckets.length, " scanning done")
+            console.debug("Bucket ", bucketIndex++, " of ", buckets.length, " scanning done")
         }
         await save(objects)
         syncing = false

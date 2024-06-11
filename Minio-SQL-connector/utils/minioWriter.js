@@ -118,7 +118,7 @@ module.exports = {
 
   async insertInDBs(newObject, record, align) {
     let csv = false
-    let jsonParsed, jsonStringified, postgreFinished, mongoFinished
+    let jsonParsed, jsonStringified, postgreFinished, logCounterFlag
     if (typeof newObject != "object")
       try {
         //jsonParsed = JSON.parse(JSON.stringify(newObject))
