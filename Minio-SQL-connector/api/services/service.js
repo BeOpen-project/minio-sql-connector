@@ -27,6 +27,7 @@ let syncing
 async function save(objects) {
     for (let obj of objects)
         await minioWriter.insertInDBs(obj.raw, obj.info, true)
+    return true
 }
 
 async function sync() {
@@ -57,6 +58,7 @@ async function sync() {
         }
         await save(objects)
         syncing = false
+        console.log("Syncing finished")
     }
     else console.log("Syncing not finished")
 }
@@ -125,6 +127,7 @@ module.exports = {
     async save(objects) {
         for (let obj of objects)
             await minioWriter.insertInDBs(obj.raw, obj.info, true)
+        return true
         //await Source.findOneAndUpdate({"record.s3.object.key" : obj.record.s3.object.key}, obj)
     },
 
@@ -168,7 +171,7 @@ module.exports = {
     async simpleQuery(query) {
         let result = await Source.find(query)
         for (let obj of result) {
-            obj.fileName = obj.name.split("/")[2]
+            obj.fileName = obj.name.split("/")[obj.name.split("/")-lenght-1]
             obj.path = obj.name
             obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
             console.debug(obj.path)

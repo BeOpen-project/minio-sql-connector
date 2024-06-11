@@ -118,7 +118,7 @@ module.exports = {
 
   async insertInDBs(newObject, record, align) {
     let csv = false
-    let jsonParsed, jsonStringified
+    let jsonParsed, jsonStringified, postgreFinished, mongoFinished
     if (typeof newObject != "object")
       try {
         //jsonParsed = JSON.parse(JSON.stringify(newObject))
@@ -148,7 +148,7 @@ module.exports = {
     //log("QUERY NAME", queryName)
     //queryName.replace(/ /g, '');
 
-    this.client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", (err, res) => {
+    this.client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", async (err, res) => {
       if (err) {
         log("ERROR searching object in DB");
         log(err);
@@ -157,6 +157,7 @@ module.exports = {
           if (err) {
             log("ERROR creating table");
             log(err);
+            postgreFinished = true
             return;
           }
           //log(common.minify(res))
@@ -164,13 +165,28 @@ module.exports = {
             if (err) {
               log("ERROR inserting object in DB");
               log(err);
+              postgreFinished = true
               return;
             }
             log("Object inserted \n");
+            postgreFinished = true
+            return
           });
 
         });
-        return;
+        while (!postgreFinished) {
+          await sleep(100)
+          if (!logCounterFlag) {
+            logCounterFlag = true
+            sleep(1000).then(resolve => {
+              if (!postgreFinished)
+                log("waiting for inserting object in postgre")
+              logCounterFlag = false
+            })
+          }
+        }
+        if (postgreFinished)
+          return postgreFinished
       }
       log("Objects found \n ")//, common.minify(res.rows));
       if (res.rows[0])
@@ -178,19 +194,24 @@ module.exports = {
           if (err) {
             log("ERROR updating object in DB");
             log(err);
+            postgreFinished = true
             return;
           }
+          postgreFinished = true
           log("Object updated \n");
-
+          return
         });
       else
         this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}')`, (err, res) => {
           if (err) {
             log("ERROR inserting object in DB");
             log(err);
+            postgreFinished = true
             return;
           }
           log("Object inserted \n");
+          postgreFinished = true
+          return
         });
 
     });
@@ -239,6 +260,19 @@ module.exports = {
         log(error)
       }
     }
+    while (!postgreFinished) {
+      await sleep(100)
+      if (!logCounterFlag) {
+        logCounterFlag = true
+        sleep(1000).then(resolve => {
+          if (!postgreFinished)
+            log("object inserted in mongo db but still waiting for inserting object in postgre")
+          logCounterFlag = false
+        })
+      }
+    }
+    if (postgreFinished)
+      return postgreFinished
   },
 
   getNotifications(bucketName) {
@@ -301,7 +335,7 @@ module.exports = {
         try {
           //resultMessage = format == 'json' ? JSON.parse(JSON.stringify(objectData)) : objectData
           resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData) : objectData
-        //  log("Json parsato")
+          //  log("Json parsato")
 
         }
         catch (error) {
