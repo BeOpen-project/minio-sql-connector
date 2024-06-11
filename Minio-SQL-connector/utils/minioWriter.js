@@ -88,7 +88,9 @@ module.exports = {
         log("Found object ")// + common.minify(JSON.stringify(obj)))
       if (data[0])
         //log(common.minify(JSON.stringify(data)))
-      resultMessage = data
+        resultMessage = data
+      else if (!resultMessage)
+        resultMessage = []
       //process.res.send(data)
     })
     stream.on('error', function (err) {
@@ -98,7 +100,7 @@ module.exports = {
 
     let logCounterFlag
     while (!errorMessage && !resultMessage) {
-      await sleep(1)
+      await sleep(100)
       if (!logCounterFlag) {
         logCounterFlag = true
         sleep(1000).then(resolve => {
