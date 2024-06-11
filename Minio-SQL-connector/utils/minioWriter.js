@@ -302,6 +302,8 @@ module.exports = {
             resultMessage = format == 'json' ? [{ data: objectData }] : objectData
           }
         }
+        if (!resultMessage)
+          resultMessage = "Empty file"
       });
 
       dataStream.on('error', function (err) {
