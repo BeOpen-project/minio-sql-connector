@@ -34,8 +34,15 @@ async function sync() {
         let objects = []
         console.debug(await minioWriter.listBuckets())
         for (let bucket of await minioWriter.listBuckets())
-            for (let obj of await minioWriter.listObjects(bucket.name))
-                objects.push({ raw: await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop()), info: { ...obj, bucketName: bucket.name } })
+            for (let obj of await minioWriter.listObjects(bucket.name)) {
+                try {
+                    let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
+                    objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
+                }
+                catch (error) {
+                    console.error(error)
+                }
+            }
         await save(objects)
         syncing = false
     }
@@ -175,8 +182,15 @@ module.exports = {
     async rawQuery(query, prefix, bucket, visibility) {
         //query.name = new RegExp("^" + prefix, 'i')
         let objects = []
-        for (let obj of await minioWriter.listObjects(bucket))
-            objects.push({ raw: await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop()), record: { ...obj, bucketName: bucket }, name : obj.name })
+        for (let obj of await minioWriter.listObjects(bucket)) {
+            try {
+                let objectGot = await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop())
+                objects.push({ raw: objectGot, record: { ...obj, bucketName: bucket }, name: obj.name })
+            }
+            catch (error) {
+                console.error(error)
+            }
+        }
         return objects.filter(obj => typeof obj.raw == "string" ? objectFilter(obj, prefix, bucket, visibility) && obj.raw.includes(query.value) : objectFilter(obj, prefix, bucket, visibility) && JSON.stringify(obj.raw).includes(query.value))
         //return objects.filter(obj => typeof obj.raw == "string" ? obj.record.name.includes(prefix) && obj.raw.includes(query.value) : obj.record.name.includes(prefix) && JSON.stringify(obj.raw).includes(query.value))
     },
