@@ -27,7 +27,7 @@ module.exports = {
         if (req.headers.visibility == "public" && req?.body?.query && !req?.body?.query?.toLowerCase().includes("public-data"))
             return res.status(400).send("If you are requesting for public files you must search in public-data bucket");
         if (req?.body?.query?.toLowerCase().includes("SELECT * FROM public-data"))
-            req?.body?.query = req?.body?.query.replace("SELECT * FROM public-data", "SELECT * FROM publicdata")
+            req.body.query = req.body.query.replace("SELECT * FROM public-data", "SELECT * FROM publicdata")
 
         if (authConfig.disableAuth)
             next()
