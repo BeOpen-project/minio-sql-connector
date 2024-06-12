@@ -45,8 +45,11 @@ async function sync() {
                     await sleep(delays)
                     console.debug("Bucket ", bucketIndex, " of ", buckets.length)
                     console.debug("Getting object ", index++, " of ", bucketObjects.length)
-                    let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
-                    objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
+                    if (obj.size && obj.isLatest) {
+                        let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
+                        objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
+                    }
+                    else console.log("Size is ", obj.size, " and "(obj.isLatest ? "is latest" : "is not latest"))
                 }
                 catch (error) {
                     console.error(error)
