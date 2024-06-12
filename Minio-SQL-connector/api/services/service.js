@@ -72,7 +72,7 @@ sync()
 //setInterval(sync, 3600000);
 
 function bucketIs(record, bucket) {
-    console.debug(record, bucket)
+    //console.debug(record, bucket)
     return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
 }
 
@@ -212,6 +212,8 @@ module.exports = {
     async rawQuery(query, prefix, bucket, visibility) {
         //query.name = new RegExp("^" + prefix, 'i')
         let objects = []
+        if (visibility == "public")
+            bucket = "public-data"
         for (let obj of await minioWriter.listObjects(bucket)) {
             try {
                 if (obj.size && obj.isLatest) {
