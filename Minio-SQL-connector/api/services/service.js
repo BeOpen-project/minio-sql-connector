@@ -175,7 +175,7 @@ module.exports = {
     async simpleQuery(query) {
         let result = await Source.find(query)
         for (let obj of result) {
-            obj.fileName = obj.name.split("/")[obj.name.split("/") - lenght - 1]
+            obj.fileName = obj.name.split("/")[obj.name.split("/").lenght - 2]
             obj.path = obj.name
             obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
             console.debug(obj.path)
