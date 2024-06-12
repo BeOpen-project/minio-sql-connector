@@ -72,6 +72,7 @@ sync()
 //setInterval(sync, 3600000);
 
 function bucketIs(record, bucket) {
+    console.debug(record, bucket)
     return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
 }
 
