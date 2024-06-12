@@ -191,7 +191,7 @@ module.exports = {
       }
       log("Objects found \n ")//, common.minify(res.rows));
       if (res.rows[0])
-        this.client.query(`UPDATE ${table} SET data = '${JSON.stringify(jsonStringified || common.cleaned(newObject))}' WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
+        this.client.query(`UPDATE ${table} SET data = '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', record = '${JSON.stringify(record)}'  WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
           if (err) {
             log("ERROR updating object in DB");
             log(err);
@@ -203,7 +203,7 @@ module.exports = {
           return
         });
       else
-        this.client.query(`INSERT INTO ${table} (name, data) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}')`, (err, res) => {
+        this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}' )`, (err, res) => {
           if (err) {
             log("ERROR inserting object in DB");
             log(err);

@@ -16,5 +16,10 @@ module.exports = {
             return res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
         res.send(await service.mongoQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
         console.log("Query mongo finished")
+    },
+
+    sync: async (req, res) => {
+        console.log("Sync")
+        return res.send(await service.sync())
     }
 }

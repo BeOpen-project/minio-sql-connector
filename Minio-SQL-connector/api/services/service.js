@@ -37,8 +37,8 @@ async function sync() {
         let buckets = await minioWriter.listBuckets()
         console.debug(buckets)
         let bucketIndex = 1
-        for (let bucket of buckets){
-            let bucketObjects =  await minioWriter.listObjects(bucket.name)
+        for (let bucket of buckets) {
+            let bucketObjects = await minioWriter.listObjects(bucket.name)
             let index = 1
             for (let obj of bucketObjects) {
                 try {
@@ -57,8 +57,12 @@ async function sync() {
         await save(objects)
         syncing = false
         console.log("Syncing finished")
+        return "Sync finished"
     }
-    else console.log("Syncing not finished")
+    else {
+        console.log("Syncing not finished")
+        return "Syncing"
+    }
 }
 
 sync()
@@ -73,13 +77,13 @@ let objectFilterCalls = 0
 function objectFilter(obj, prefix, bucket, visibility) {
     //console.debug(obj, prefix, bucket, visibility)
     console.debug(++objectFilterCalls)
-    if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj.name.includes(prefix))) {
+    if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj?.name?.includes(prefix))) {
         //console.debug(true)
         return true
     }
-    if (visibility == "shared" && bucketIs(obj.record, bucket) && obj.name.includes(bucket.toUpperCase() + " SHARED Data/"))
+    if (visibility == "shared" && bucketIs(obj?.record, bucket) && obj?.name?.includes(bucket?.toUpperCase() + " SHARED Data/"))
         return true
-    if (visibility == "public" && bucketIs(obj.record, "public-data"))
+    if (visibility == "public" && bucketIs(obj?.record, "public-data"))
         return true
     return false
 
@@ -95,6 +99,8 @@ module.exports = {
             }
         })
     },
+
+    sync: sync,
 
     async save0(objects) {
 
@@ -169,7 +175,7 @@ module.exports = {
     async simpleQuery(query) {
         let result = await Source.find(query)
         for (let obj of result) {
-            obj.fileName = obj.name.split("/")[obj.name.split("/")-lenght-1]
+            obj.fileName = obj.name.split("/")[obj.name.split("/") - lenght - 1]
             obj.path = obj.name
             obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
             console.debug(obj.path)
