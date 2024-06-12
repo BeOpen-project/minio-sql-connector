@@ -45,7 +45,7 @@ async function sync() {
                     await sleep(delays)
                     console.debug("Bucket ", bucketIndex, " of ", buckets.length)
                     console.debug("Getting object ", index++, " of ", bucketObjects.length)
-                    if (obj.size && obj.isLatest) {
+                    if (obj.size && obj.isLatest) {//} && !obj.isDeleteMarker) {
                         let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                         objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                     }
@@ -79,7 +79,7 @@ let objectFilterCalls = 0
 
 function objectFilter(obj, prefix, bucket, visibility) {
     //console.debug(obj, prefix, bucket, visibility)
-    console.debug(++objectFilterCalls)
+    //console.debug(++objectFilterCalls)
     if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj?.name?.includes(prefix))) {
         //console.debug(true)
         return true
@@ -213,8 +213,10 @@ module.exports = {
         let objects = []
         for (let obj of await minioWriter.listObjects(bucket)) {
             try {
-                let objectGot = await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop())
-                objects.push({ raw: objectGot, record: { ...obj, bucketName: bucket }, name: obj.name })
+                if (obj.size && obj.isLatest) {
+                    let objectGot = await minioWriter.getObject(bucket, obj.name, obj.name.split(".").pop())
+                    objects.push({ raw: objectGot, record: { ...obj, bucketName: bucket }, name: obj.name })
+                }
             }
             catch (error) {
                 console.error(error)
