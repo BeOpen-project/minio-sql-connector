@@ -22,6 +22,7 @@ module.exports = {
     port: 5432
   },
   syncInterval :  86400000,
+  delays : 1000,
   mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
   authConfig: {
     idmHost: "https://platform.beopen-dep.it/auth",

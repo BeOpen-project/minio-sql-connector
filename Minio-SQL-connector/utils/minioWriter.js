@@ -1,7 +1,7 @@
 var Minio = require('minio')
 const { sleep } = require('./common.js')
 const common = require('./common.js')
-const { minioConfig } = require('../config.js')
+const { minioConfig, delays } = require('../config.js')
 const Source = require('../api/models/source.js')
 
 let minioClient = new Minio.Client(minioConfig)
@@ -100,10 +100,10 @@ module.exports = {
 
     let logCounterFlag
     while (!errorMessage && !resultMessage) {
-      await sleep(100)
+      await sleep(delays)
       if (!logCounterFlag) {
         logCounterFlag = true
-        sleep(1000).then(resolve => {
+        sleep(delays + 2000).then(resolve => {
           if (!errorMessage && !resultMessage)
             log("waiting for list")
           logCounterFlag = false
@@ -117,17 +117,18 @@ module.exports = {
   },
 
   async insertInDBs(newObject, record, align) {
+    log("Insert in DBs ", record?.s3?.object?.key || record.name)
     let csv = false
     let jsonParsed, jsonStringified, postgreFinished, logCounterFlag
     if (typeof newObject != "object")
       try {
         //jsonParsed = JSON.parse(JSON.stringify(newObject))
-        log("New object\n")//, common.minify(newObject), "\ntype : ", typeof newObject)
+        //log("New object\n")//, common.minify(newObject), "\ntype : ", typeof newObject)
         jsonParsed = JSON.parse(newObject)
-        log("Adesso è un json")
+        //log("Adesso è un json")
       }
       catch (error) {
-        log("Not a json")
+        //log("Not a json")
         //log(error)
         let extension = (record?.s3?.object?.key || record.name).split(".").pop()
         if (extension == "csv")
@@ -135,7 +136,7 @@ module.exports = {
         csv = true
       }
     else {
-      log("Era già un json")
+      //log("Era già un json")
       jsonParsed = newObject
     }
 
@@ -175,10 +176,10 @@ module.exports = {
 
         });
         while (!postgreFinished) {
-          await sleep(100)
+          await sleep(delays)
           if (!logCounterFlag) {
             logCounterFlag = true
-            sleep(1000).then(resolve => {
+            sleep(delays + 2000).then(resolve => {
               if (!postgreFinished)
                 log("waiting for inserting object in postgre")
               logCounterFlag = false
@@ -261,10 +262,10 @@ module.exports = {
       }
     }
     while (!postgreFinished) {
-      await sleep(100)
+      await sleep(delays)
       if (!logCounterFlag) {
         logCounterFlag = true
-        sleep(1000).then(resolve => {
+        sleep(delays + 2000).then(resolve => {
           if (!postgreFinished)
             log("object inserted in mongo db but still waiting for inserting object in postgre")
           logCounterFlag = false
@@ -365,10 +366,10 @@ module.exports = {
 
     let logCounterFlag
     while (!errorMessage && !resultMessage) {
-      await sleep(100)
+      await sleep(delays)
       if (!logCounterFlag) {
         logCounterFlag = true
-        sleep(1000).then(resolve => {
+        sleep(delays + 2000).then(resolve => {
           if (!errorMessage && !resultMessage)
             log("waiting for object " + objectName + " in bucket " + bucketName)
           logCounterFlag = false
