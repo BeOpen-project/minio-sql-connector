@@ -154,7 +154,7 @@ module.exports = {
         log("ERROR searching object in DB");
         log(err);
         // CREATE TABLE nome-bucket (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)
-        this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB, record JSONB)", (err, res) => {
+        this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)", (err, res) => {
           if (err) {
             log("ERROR creating table");
             log(err);
