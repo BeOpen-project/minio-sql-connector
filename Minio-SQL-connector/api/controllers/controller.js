@@ -21,5 +21,15 @@ module.exports = {
     sync: async (req, res) => {
         console.log("Sync")
         return res.send(await service.sync())
-    }
+    },
+
+    minioListObjects: async (req, res) => {
+        try {
+            res.send(await service.minioListObjects(req.params.bucketName || req.query.bucketName))
+        }
+        catch (error) {
+            console.error(error)
+            res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
+        }
+    },
 }

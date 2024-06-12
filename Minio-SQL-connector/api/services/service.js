@@ -2,7 +2,7 @@ const Source = require('../models/source')
 const common = require('../../utils/common')
 const { sleep } = require('../../utils/common')
 const { Client } = require('pg');
-const { minioConfig, postgreConfig } = require('../../config')
+const { minioConfig, postgreConfig, delays } = require('../../config')
 const minioWriter = require("../../utils/minioWriter")
 const client = new Client(postgreConfig);
 client.connect();
@@ -42,7 +42,7 @@ async function sync() {
             let index = 1
             for (let obj of bucketObjects) {
                 try {
-                    await sleep(100)
+                    await sleep(delays)
                     console.debug("Bucket ", bucketIndex, " of ", buckets.length)
                     console.debug("Getting object ", index++, " of ", bucketObjects.length)
                     let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
@@ -101,6 +101,10 @@ module.exports = {
     },
 
     sync: sync,
+
+    async minioListObjects(bucketName) {
+        return await minioWriter.listObjects(bucketName)
+    },
 
     async save0(objects) {
 
