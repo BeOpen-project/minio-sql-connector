@@ -1,7 +1,7 @@
 var Minio = require('minio')
 const { sleep } = require('./common.js')
 const common = require('./common.js')
-const { minioConfig, delays } = require('../config.js')
+const { minioConfig, delays, queryAllowedExtensions } = require('../config.js')
 const Source = require('../api/models/source.js')
 
 let minioClient = new Minio.Client(minioConfig)
@@ -116,6 +116,44 @@ module.exports = {
       return resultMessage
   },
 
+  async deleteInDBs(record) {
+    let postgreFinished, logCounterFlag
+    let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
+    this.client.query(`DELETE FROM ${table} WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
+      if (err) {
+        log("ERROR inserting object in DB");
+        log(err);
+        postgreFinished = true
+        return;
+      }
+      log("Object deleted \n");
+      postgreFinished = true
+      return
+    });
+
+    while (!postgreFinished) {
+      await sleep(delays)
+      if (!logCounterFlag) {
+        logCounterFlag = true
+        sleep(delays + 2000).then(resolve => {
+          if (!postgreFinished)
+            log("waiting for deleting object in postgre")
+          logCounterFlag = false
+        })
+      }
+    }
+
+    try {
+      log("DELETE QUERY")
+      log({ 'name': (record?.s3?.object?.key || record.name) })
+
+      await Source.deleteMany({ 'name': (record?.s3?.object?.key || record.name) })//record.s3.object
+    }
+    catch (error) {
+      log(error)
+    }
+  },
+
   async insertInDBs(newObject, record, align) {
     log("Insert in DBs ", record?.s3?.object?.key || record.name)
     let csv = false
@@ -189,8 +227,8 @@ module.exports = {
         if (postgreFinished)
           return postgreFinished
       }
-      log("Objects found \n ")//, common.minify(res.rows));
-      if (res.rows[0])
+      if (res.rows[0]) {
+        log("Objects found \n ")//, common.minify(res.rows));
         this.client.query(`UPDATE ${table} SET data = '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', record = '${JSON.stringify(record)}'  WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
           if (err) {
             log("ERROR updating object in DB");
@@ -202,6 +240,7 @@ module.exports = {
           log("Object updated \n");
           return
         });
+      }
       else
         this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}' )`, (err, res) => {
           if (err) {
@@ -278,26 +317,45 @@ module.exports = {
 
   getNotifications(bucketName) {
 
-    const poller = minioClient.listenBucketNotification(bucketName, '', '', ['s3:ObjectCreated:*'])
+    //const poller = minioClient.listenBucketNotification(bucketName, '', '', ['s3:ObjectCreated:*'])
+    const poller = minioClient.listenBucketNotification(bucketName, '', '', ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"])
     poller.on('notification', async (record) => {
+      console.debug(record)
       log('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size)
-      let newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
+      let extension = record.s3.object.key.split(".").pop()
+      let isAllowed = (queryAllowedExtensions == "all" || queryAllowedExtensions.includes(extension))
+      let newObject
       try {
         log("Getting object")
-        newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
-        log("Got")
+        if (record.eventName != 's3:ObjectRemoved:Delete' && record.s3.object.size && isAllowed) {
+          newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
+          log("Got")
+        }
       }
       catch (error) {
         log("Error during getting object")
         console.error(error)
         return
       }
-      log("New object\n", common.minify(newObject), "\ntype : ", typeof newObject)
+      if (newObject)
+        log("New object\n", common.minify(newObject), "\ntype : ", typeof newObject)
       //log(record.s3)
       //log(record)
-      await this.insertInDBs(newObject, record, false)
+      //console.log(queryAllowedExtensions)
+      if (isAllowed)
+        if (record.eventName != 's3:ObjectRemoved:Delete')
+          if (record.s3.object.size)
+            await this.insertInDBs(newObject, record, false)
+          else
+            console.log("Size is ", record.s3.object.size || "0", " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+        else
+          await this.deleteInDBs(record)
+      else
+        console.log("Size is ", record.s3.object.size || "0", " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+
     })
     poller.on('error', (error) => {
+      log("Error on poller")
       log(error)
       //log("Creating bucket")
       //this.creteBucket(bucketName, minioConfig.location).then(message => {

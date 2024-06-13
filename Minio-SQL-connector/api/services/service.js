@@ -2,7 +2,8 @@ const Source = require('../models/source')
 const common = require('../../utils/common')
 const { sleep } = require('../../utils/common')
 const { Client } = require('pg');
-const { minioConfig, postgreConfig, delays } = require('../../config')
+const config = require('../../config')
+const { minioConfig, postgreConfig, delays, queryAllowedExtensions } = config
 const minioWriter = require("../../utils/minioWriter")
 const client = new Client(postgreConfig);
 client.connect();
@@ -44,12 +45,15 @@ async function sync() {
                 try {
                     await sleep(delays)
                     console.debug("Bucket ", bucketIndex, " of ", buckets.length)
-                    console.debug("Getting object ", index++, " of ", bucketObjects.length)
-                    if (obj.size && obj.isLatest) {//} && !obj.isDeleteMarker) {
+                    console.debug("Scanning object ", index++, " of ", bucketObjects.length, ",", obj.name)
+                    let extension = obj.name.split(".").pop()
+                    //console.log(queryAllowedExtensions)
+                    let isAllowed = (queryAllowedExtensions == "all" || queryAllowedExtensions.includes(extension))
+                    if (obj.size && obj.isLatest && isAllowed) {//} && !obj.isDeleteMarker) {
                         let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                         objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                     }
-                    else console.log("Size is ", obj.size, " and "(obj.isLatest ? "is latest" : "is not latest"))
+                    else console.log("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed? "is allowed" : "is not allowed"))
                 }
                 catch (error) {
                     console.error(error)

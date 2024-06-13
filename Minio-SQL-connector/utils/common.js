@@ -77,5 +77,11 @@ module.exports = {
     // Verifica che il valore della chiave sia uguale a "value"
     //console.debug(obj[keys[0]], obj[keys[0]] == "value")
     return obj.value;
+  },
+
+  checkConfig(configIn){
+    
+    if (!configIn.queryAllowedExtensions) configIn.queryAllowedExtensions = ["csv", "json", "geojson"]
+    return configIn
   }
 }

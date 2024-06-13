@@ -23,6 +23,7 @@ module.exports = {
   },
   syncInterval :  86400000,
   delays : 1000,
+  queryAllowedExtensions : ["csv", "json", "geojson"],
   mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
   authConfig: {
     idmHost: "https://platform.beopen-dep.it/auth",

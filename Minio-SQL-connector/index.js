@@ -1,5 +1,6 @@
-
-const config = require('./config')
+const common = require("./utils/common")
+const config = common.checkConfig(require('./config'))
+console.log(config.queryAllowedExtensions)
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
