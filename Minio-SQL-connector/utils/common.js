@@ -19,6 +19,10 @@ module.exports = {
     }
   },
 
+  parseJwt(token) {
+    return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+  },
+
   urlEncode(bucket){
     return bucket.replaceAll("-", "")
   },
@@ -52,30 +56,15 @@ module.exports = {
     return JSON.stringify(results);
   },
 
-  setQuery(query) {
-
-  },
-
   cleaned(obj) {
-    //console.debug("CLEAN")
-    //console.debug(this.minify(obj))
     //return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"\r\n\s]/g, '');
-
     return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"]/g, '');
   },
 
   isRawQuery(obj) {
     const keys = Object.keys(obj);
-
-    //console.debug(keys.length)
-
-    // Verifica che ci sia una sola chiave
-    if (keys.length !== 1) {
+    if (keys.length !== 1) 
       return false;
-    }
-
-    // Verifica che il valore della chiave sia uguale a "value"
-    //console.debug(obj[keys[0]], obj[keys[0]] == "value")
     return obj.value;
   },
 

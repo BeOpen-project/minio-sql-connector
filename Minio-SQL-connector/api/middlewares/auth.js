@@ -1,22 +1,15 @@
 const config = require('../../config')
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
-//const authConfig = (await axios.get("http://localhost:12345/data-model-mapper-gui/assets/config.json")).data
 const authConfig = config.authConfig
 const keycloakServerURL = authConfig.idmHost;
 const realm = authConfig.authRealm;
 const clientID = authConfig.clientId;
 const clientSecret = authConfig.secret;
-const common = require("../../utils/common")
-
-function parseJwt(token) {
-    return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-}
+const {parseJwt} = require("../../utils/common")
 
 module.exports = {
     auth: async (req, res, next) => {
-
-        process.env.start = Date.now()
 
         if (req.body.file)
             req.body = JSON.parse(req.body.file)
@@ -26,11 +19,13 @@ module.exports = {
 
         if (req.headers.visibility == "public" && req?.body?.query && !req?.body?.query?.toLowerCase().includes("public-data"))
             return res.status(400).send("If you are requesting for public files you must search in public-data bucket");
+
         if (req?.body?.query?.toLowerCase().includes("select * from public-data"))
             req.body.query = req.body.query.replace("SELECT * FROM public-data", "SELECT * FROM publicdata")
 
         if (authConfig.disableAuth)
             next()
+
         else {
             let authHeader = req.headers.authorization;
 
@@ -39,8 +34,6 @@ module.exports = {
                     authHeader = "Bearer " + authHeader
 
                 const jwtToken = authHeader.split(' ')[1];
-
-                //console.debug("!" + jwtToken, "\n", Buffer.from(jwtToken.split(".")[1], 'base64').toString())
 
                 let verifiedToken
                 try {
@@ -104,8 +97,6 @@ module.exports = {
                             req.body.prefix = decodedToken.email
                             config.group = decodedToken.email
                         }
-
-                        //console.debug(req.body, req.params, req.query)
 
                         //if (req.params.bucketName && req.params.objectName)
                         //    console.debug(req.body.bucketName , req.params.bucketName , req.body.prefix , req.params.objectName.split("/")[0] + "/" + req.params.objectName.split("/")[1])

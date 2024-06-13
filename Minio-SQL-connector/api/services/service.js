@@ -8,22 +8,18 @@ const minioWriter = require("../../utils/minioWriter")
 const client = new Client(postgreConfig);
 client.connect();
 minioWriter.client = client
+let syncing
 if (minioConfig.subscribe.all)
     minioWriter.listBuckets().then((buckets) => {
         let a = 1
         for (let bucket of buckets) {
-            console.debug("Bucket name : " + bucket.name.toString())
-            //minioWriter.subscribe(bucket.name.toString())
-            //minioWriter.setNotifications(bucket.name.toString())
             minioWriter.getNotifications(bucket.name.toString())
-            console.debug("Subscribed bucket " + (a++) + " of " + buckets.length)
+            console.debug("Subscribed bucket " + (a++) + " of " + buckets.length, "(", bucket.name, ")")
         }
     })
 else
     for (let bucket of minioConfig.subscribe.buckets)
         minioWriter.getNotifications(bucket)
-
-let syncing
 
 async function save(objects) {
     for (let obj of objects)
@@ -36,7 +32,7 @@ async function sync() {
         syncing = true
         let objects = []
         let buckets = await minioWriter.listBuckets()
-        console.debug(buckets)
+        //console.debug(buckets)
         let bucketIndex = 1
         for (let bucket of buckets) {
             let bucketObjects = await minioWriter.listObjects(bucket.name)
@@ -53,7 +49,7 @@ async function sync() {
                         let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                         objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                     }
-                    else console.log("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed? "is allowed" : "is not allowed"))
+                    else console.log("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
                 }
                 catch (error) {
                     console.error(error)
@@ -73,22 +69,17 @@ async function sync() {
 }
 
 sync()
-//setInterval(sync, 3600000);
+if (config.syncInterval)
+    setInterval(sync, config.syncInterval);
 
 function bucketIs(record, bucket) {
     //console.debug(record, bucket)
     return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
 }
 
-let objectFilterCalls = 0
-
 function objectFilter(obj, prefix, bucket, visibility) {
-    //console.debug(obj, prefix, bucket, visibility)
-    //console.debug(++objectFilterCalls)
-    if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj?.name?.includes(prefix))) {
-        //console.debug(true)
+    if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj?.name?.includes(prefix))) 
         return true
-    }
     if (visibility == "shared" && bucketIs(obj?.record, bucket) && obj?.name?.includes(bucket?.toUpperCase() + " SHARED Data/"))
         return true
     if (visibility == "public" && bucketIs(obj?.record, "public-data"))
@@ -114,37 +105,10 @@ module.exports = {
         return await minioWriter.listObjects(bucketName)
     },
 
-    async save0(objects) {
-
-        await Source.deleteMany({ "record.s3.bucket.name": bucket })
-        // TRUNCATE TABLE users;
-        this.client.query("TRUNCATE TABLE " + bucket, (err, res) => {
-            if (err) {
-                console.error("ERROR deleting object in DB");
-                console.error(err);
-                return;
-            }
-            console.log("Objects deleted ", res?.rows);
-        });
-        for (let record of objects)
-            this.client.query(`INSERT INTO ${bucket} (name, data) VALUES ('${record.s3.object.key}', '${jsonStringified || common.cleaned(newObject)}')`, (err, res) => {
-                if (err) {
-                    console.error("ERROR inserting object in DB");
-                    console.error(err);
-                    return;
-                }
-                console.log("Object inserted \n");
-
-                //console.log("Object inserted \n", res.rows);
-            });
-        return await Source.insertMany(objects)
-    },
-
     async save(objects) {
         for (let obj of objects)
             await minioWriter.insertInDBs(obj.raw, obj.info, true)
         return true
-        //await Source.findOneAndUpdate({"record.s3.object.key" : obj.record.s3.object.key}, obj)
     },
 
     async exampleQueryJson(query) {
@@ -158,30 +122,70 @@ module.exports = {
 
     async exampleQueryGeoJson(query) {
 
-        let key
-
-        for (let k in query)
-            key = k
-
-        console.debug(query[key])
-
-        return await Source.find({
-            "features": {
-                $elemMatch: {
-                    //"a": {
-                    "geometry.coordinates": {
-                        $elemMatch: {
+        //let key
+        //for (let k in query)
+        //    key = k
+        let found = []
+        //TODO now there is a preset deep level search, but this level should be parametrized
+        found.push(
+            await Source.find({
+                "features": {
+                    $elemMatch: {
+                        "geometry.coordinates": {
                             $elemMatch: {
-
                                 $elemMatch: {
-                                    $elemMatch: { $eq: Number(query[key]) }
+                                    $elemMatch: {
+                                        $elemMatch: {
+                                            $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        })
+            }),
+            await Source.find({
+                "features": {
+                    $elemMatch: {
+                        "geometry.coordinates": {
+                            $elemMatch: {
+                                $elemMatch: {
+                                    $elemMatch: {
+                                        $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }),
+            await Source.find({
+                "features": {
+                    $elemMatch: {
+                        "geometry.coordinates": {
+                            $elemMatch: {
+                                $elemMatch: {
+                                    $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }),
+            await Source.find({
+                "features": {
+                    $elemMatch: {
+                        "geometry.coordinates": {
+                            $elemMatch: {
+                                $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
+                            }
+                        }
+                    }
+                }
+            }),
+        )
+        return found
     },
 
     async simpleQuery(query) {
@@ -190,14 +194,9 @@ module.exports = {
             obj.fileName = obj.name.split("/")[obj.name.split("/").lenght - 2]
             obj.path = obj.name
             obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
-            console.debug(obj.path)
         }
         return result
     },
-
-    //fileName
-    //path 
-    //fileType
 
     async mongoQuery(query, prefix, bucket, visibility) {
         let format = query.format?.toLowerCase()
@@ -244,8 +243,6 @@ module.exports = {
                 return;
             }
             else {
-                //if (visibility == "shared")
-                //    prefix = bucket + " " 
                 response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)))
                 console.log(res.rows);
                 console.log("Query sql finished")

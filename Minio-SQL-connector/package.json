@@ -25,7 +25,9 @@
     "minio": "^8.0.0",
     "mongoose": "^8.3.4",
     "nodemon": "^3.1.0",
-    "pg": "^8.11.5",
+    "pg": "^8.11.5"
+  },
+  "stashDependencies" : {
     "urlencode": "^2.0.0"
   }
 }

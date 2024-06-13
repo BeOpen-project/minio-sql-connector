@@ -234,9 +234,8 @@ module.exports = {
         log(error)
       }
 
-    try {// TODO: better doing an update...
+    try {// TODO better doing an update...
       log("Delete ", (record?.s3?.object?.key || record.name))
-      log({ 'name': (record?.s3?.object?.key || record.name) })
       await Source.deleteMany({ 'name': (record?.s3?.object?.key || record.name) })//record.s3.object
     }
     catch (error) {
@@ -249,8 +248,8 @@ module.exports = {
     log("Extension ", extension)
     log("Is array : ", Array.isArray(jsonParsed))
     log("Type ", typeof jsonParsed)
-    //log("Il file è questo \n", common.minify(jsonParsed))
-    //log("Ecco i dettagli \n", record)
+    //log("This is the file \n", common.minify(jsonParsed))
+    //log("Here's details \n", record)
     if (!jsonParsed)
       log("Empty object of extension ", extension)
 
@@ -259,14 +258,15 @@ module.exports = {
       await Source.insertMany(insertingSource)
     }
     catch (error) {
-      log("Probably there are some special characters not allowed")
-      log(error)
+      if (!error.errorResponse.message.includes("Document can't have"))
+        log(error)
+      //log("Probably there are some special characters not allowed")
       try {
         await Source.insertMany(JSON.parse(JSON.stringify(insertingSource).replace(/\$/g, '')))
-        log("Indeed")
+        //log("Indeed")
       }
       catch (error) {
-        log("There are other problems inserting object in mongo DB")
+        log("There are problems inserting object in mongo DB")
         log(error)
       }
     }
@@ -365,8 +365,8 @@ module.exports = {
             //log("Json parsed")
           }
           catch (error) {
-          //log("Really it was not a json ? \n", error)
-          resultMessage = format == 'json' ? [{ data: objectData }] : objectData
+            //log("Really it was not a json ? \n", error)
+            resultMessage = format == 'json' ? [{ data: objectData }] : objectData
           }
         }
         if (!resultMessage)

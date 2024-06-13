@@ -21,16 +21,16 @@ module.exports = {
     password: '',
     port: 5432
   },
-  syncInterval :  86400000,
-  delays : 1000,
+  syncInterval : 86400000,
+  delays : 1,
   queryAllowedExtensions : ["csv", "json", "geojson"],
   parseCompatibilityMode : 0,
   mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
   authConfig: {
     idmHost: "https://platform.beopen-dep.it/auth",
     clientId: "",
-    userInfoEndpoint: "https://platform.beopen-dep.it/api/user",//"http://localhost:5500/api/mockGetUser",
-    //disableAuth: true,
+    userInfoEndpoint: "https://platform.beopen-dep.it/api/user",
+    disableAuth: false,
     authProfile: "oidc",
     authRealm: "",
     introspect: false,
