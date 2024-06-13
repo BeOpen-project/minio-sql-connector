@@ -1,11 +1,10 @@
 var Minio = require('minio')
-const { sleep } = require('./common.js')
 const common = require('./common.js')
-const { minioConfig, delays, queryAllowedExtensions } = require('../config.js')
-const Source = require('../api/models/source.js')
-
+const { sleep } = common
+const config = require('../config.js')
+const { minioConfig, delays, queryAllowedExtensions } = config
+const Source = require('../api/models/source.js')//TODO divide collections by email and/or bucket
 let minioClient = new Minio.Client(minioConfig)
-let logs = []
 const fs = require('fs');
 const logFile = 'log.txt';
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -13,62 +12,38 @@ const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 function logSizeChecker() {
   let stats = fs.statSync(logFile)
   let fileSizeInBytes = stats.size;
-  // Convert the file size to megabytes (optional)
   let fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
-  log("Log size is ", fileSizeInMegabytes)
+  console.log("Log size is ", fileSizeInMegabytes)
   if (fileSizeInMegabytes > 50)
     fs.writeFile(logFile, "", err => {
       if (err) {
         console.error(err);
       } else {
-        log("Log reset")
+        console.log("Log reset")
       }
     });
 }
 
-//setInterval(logSizeChecker, 3600000);
-
 function log(...m) {
   console.log(...m)
-  //logs.push(m)
-
-  /*
-  let args = [...m]
-  for (let arg of args)
-    if (arg && (Array.isArray(arg) || typeof arg == "object"))
-      logStream.write(JSON.stringify(arg) + '\n');
-    else
-      logStream.write(arg + '\n');
-    */
+  if (config.writeLogsOnFile) {
+    let args = [...m]
+    for (let arg of args)
+      if (arg && (Array.isArray(arg) || typeof arg == "object"))
+        logStream.write(JSON.stringify(arg) + '\n');
+      else
+        logStream.write(arg + '\n');
+  }
 }
+
+if (config.writeLogsOnFile)
+  setInterval(logSizeChecker, 3600000)
 
 module.exports = {
 
   client: undefined,
 
-  subscribe(bucket) {
-    minioClient.getBucketNotification(bucket, function (err, bucketNotificationConfig) {
-      if (err) return log(err)
-      log("SUBSCRIBE", bucketNotificationConfig)
-    })
-  },
-
-  setNotifications(bucket) {
-
-    var bucketNotification = new Minio.NotificationConfig()
-    var arn = Minio.buildARN('aws', 'sqs', 'us-east-1', '1', 'webhook')
-    var queue = new Minio.QueueConfig(arn)
-    queue.addEvent(Minio.ObjectReducedRedundancyLostObject)
-    queue.addEvent(Minio.ObjectCreatedAll)
-    bucketNotification.add(queue)
-    minioClient.setBucketNotification(bucket, bucketNotification, function (err) {
-      if (err) return log(err)
-      log('Success')
-    })
-  },
-
-  async listObjects(bucketName, prefix, recursive) {
-
+  async listObjects(bucketName) {
 
     let resultMessage
     let errorMessage
@@ -137,16 +112,14 @@ module.exports = {
         logCounterFlag = true
         sleep(delays + 2000).then(resolve => {
           if (!postgreFinished)
-            log("waiting for deleting object in postgre")
+            log("Waiting for deleting object in postgre")
           logCounterFlag = false
         })
       }
     }
 
     try {
-      log("DELETE QUERY")
-      log({ 'name': (record?.s3?.object?.key || record.name) })
-
+      log("Delete ", record?.s3?.object?.key || record.name)
       await Source.deleteMany({ 'name': (record?.s3?.object?.key || record.name) })//record.s3.object
     }
     catch (error) {
@@ -160,10 +133,9 @@ module.exports = {
     let jsonParsed, jsonStringified, postgreFinished, logCounterFlag
     if (typeof newObject != "object")
       try {
-        //jsonParsed = JSON.parse(JSON.stringify(newObject))
         //log("New object\n")//, common.minify(newObject), "\ntype : ", typeof newObject)
         jsonParsed = JSON.parse(newObject)
-        //log("Adesso è un json")
+        //log("Now is a json")
       }
       catch (error) {
         //log("Not a json")
@@ -174,24 +146,22 @@ module.exports = {
         csv = true
       }
     else {
-      //log("Era già un json")
+      //log("Already a json")
       jsonParsed = newObject
     }
 
     let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
     //log(record)
-
-    //log("before postgre query", common.minify(record?.s3?.object))
-    //log("before postgre query", common.minify(JSON.stringify(jsonStringified || common.cleaned(newObject))))
+    //log("Before postgre query", common.minify(record?.s3?.object))
+    //log(common.minify(JSON.stringify(jsonStringified || common.cleaned(newObject))))
     let queryName = record?.s3?.object?.key || record.name
-    //log("QUERY NAME", queryName)
+    //log("Query name", queryName)
     //queryName.replace(/ /g, '');
 
     this.client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", async (err, res) => {
       if (err) {
         log("ERROR searching object in DB");
         log(err);
-        // CREATE TABLE nome-bucket (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)
         this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)", (err, res) => {
           if (err) {
             log("ERROR creating table");
@@ -213,7 +183,7 @@ module.exports = {
           });
 
         });
-        while (!postgreFinished) {
+        while (!postgreFinished) { //TODO create a function for this
           await sleep(delays)
           if (!logCounterFlag) {
             logCounterFlag = true
@@ -256,7 +226,6 @@ module.exports = {
 
     });
 
-    //jsonParsed = JSON.parse(JSON.stringify(jsonStringified || newObject))
     if ((!jsonParsed) || (jsonParsed && typeof jsonParsed != "object"))
       try {
         jsonParsed = JSON.parse(jsonStringified || newObject)
@@ -265,38 +234,39 @@ module.exports = {
         log(error)
       }
 
-    try {
-      log("DELETE QUERY")
+    try {// TODO: better doing an update...
+      log("Delete ", (record?.s3?.object?.key || record.name))
       log({ 'name': (record?.s3?.object?.key || record.name) })
-
       await Source.deleteMany({ 'name': (record?.s3?.object?.key || record.name) })//record.s3.object
     }
     catch (error) {
       log(error)
     }
-
     //log(record)
-
     let name = record?.s3?.object?.key || record.name
     name = name.split(".")
     let extension = name.pop()
     log("Extension ", extension)
-    log("E' un array : ", Array.isArray(jsonParsed))
+    log("Is array : ", Array.isArray(jsonParsed))
     log("Type ", typeof jsonParsed)
     //log("Il file è questo \n", common.minify(jsonParsed))
     //log("Ecco i dettagli \n", record)
     if (!jsonParsed)
       log("Empty object of extension ", extension)
 
+    let insertingSource = [extension == "csv" ? { csv: jsonParsed, record, name: record?.s3?.object?.key || record.name } : Array.isArray(jsonParsed) ? { json: jsonParsed, record, name: record?.s3?.object?.key || record.name } : typeof jsonParsed == "object" ? { ...jsonParsed, record, name: record?.s3?.object?.key || record.name } : { raw: jsonParsed, record, name: record?.s3?.object?.key || record.name }]
     try {
-      await Source.insertMany([extension == "csv" ? { csv: jsonParsed, record, name: record?.s3?.object?.key || record.name } : Array.isArray(jsonParsed) ? { json: jsonParsed, record, name: record?.s3?.object?.key || record.name } : typeof jsonParsed == "object" ? { ...jsonParsed, record, name: record?.s3?.object?.key || record.name } : { raw: jsonParsed, record, name: record?.s3?.object?.key || record.name }])
+      await Source.insertMany(insertingSource)
     }
     catch (error) {
-      //log(error)
+      log("Probably there are some special characters not allowed")
+      log(error)
       try {
-        await Source.insertMany(JSON.parse(JSON.stringify([extension == "csv" ? { csv: jsonParsed, record, name: record?.s3?.object?.key || record.name } : Array.isArray(jsonParsed) ? { json: jsonParsed, record, name: record?.s3?.object?.key || record.name } : typeof jsonParsed == "object" ? { ...jsonParsed, record, name: record?.s3?.object?.key || record.name } : { raw: jsonParsed, record, name: record?.s3?.object?.key || record.name }]).replace(/\$/g, '')))
+        await Source.insertMany(JSON.parse(JSON.stringify(insertingSource).replace(/\$/g, '')))
+        log("Indeed")
       }
       catch (error) {
+        log("There are other problems inserting object in mongo DB")
         log(error)
       }
     }
@@ -317,17 +287,15 @@ module.exports = {
 
   getNotifications(bucketName) {
 
-    //const poller = minioClient.listenBucketNotification(bucketName, '', '', ['s3:ObjectCreated:*'])
     const poller = minioClient.listenBucketNotification(bucketName, '', '', ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"])
     poller.on('notification', async (record) => {
-      console.debug(record)
-      log('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size)
+      log('New object: %s/%s (size: %d)', record.s3.bucket.name, record.s3.object.key, record.s3.object.size || 0)
       let extension = record.s3.object.key.split(".").pop()
       let isAllowed = (queryAllowedExtensions == "all" || queryAllowedExtensions.includes(extension))
       let newObject
       try {
-        log("Getting object")
         if (record.eventName != 's3:ObjectRemoved:Delete' && record.s3.object.size && isAllowed) {
+          log("Getting object")
           newObject = await this.getObject(record.s3.bucket.name, record.s3.object.key, record.s3.object.key.split(".").pop())
           log("Got")
         }
@@ -339,30 +307,21 @@ module.exports = {
       }
       if (newObject)
         log("New object\n", common.minify(newObject), "\ntype : ", typeof newObject)
-      //log(record.s3)
-      //log(record)
-      //console.log(queryAllowedExtensions)
       if (isAllowed)
         if (record.eventName != 's3:ObjectRemoved:Delete')
           if (record.s3.object.size)
             await this.insertInDBs(newObject, record, false)
           else
-            console.log("Size is ", record.s3.object.size || "0", " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+            console.log("Size is ", record.s3.object.size || 0, " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
         else
           await this.deleteInDBs(record)
       else
-        console.log("Size is ", record.s3.object.size || "0", " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+        console.log("Size is ", record.s3.object.size || 0, " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
 
     })
     poller.on('error', (error) => {
       log("Error on poller")
       log(error)
-      //log("Creating bucket")
-      //this.creteBucket(bucketName, minioConfig.location).then(message => {
-      //  log(message)
-      //  this.getNotifications(bucketName)
-      //}
-      //)
     })
   },
 
@@ -392,22 +351,22 @@ module.exports = {
       dataStream.on('end', function () {
         //log('Object data: ', common.minify(objectData));
         try {
-          //resultMessage = format == 'json' ? JSON.parse(JSON.stringify(objectData)) : objectData
           resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData) : objectData
-          //  log("Json parsato")
+          //log("Json parsed")
 
         }
         catch (error) {
-          //log("Non era un json ? \n", error)
+          //log("It was not a json ? \n", error)
           try {
-            //resultMessage = format == 'json' ? JSON.parse(JSON.stringify(objectData)) : objectData
-            resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData.substring(1)) : objectData
-            //log("Json parsato")
-
+            if (config.parseCompatibilityMode === 1)
+              resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData.substring(1)) : objectData
+            else
+              resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData.substring(objectData.indexOf("{"))) : objectData
+            //log("Json parsed")
           }
           catch (error) {
-            //log("Non era un json ? \n", error)
-            resultMessage = format == 'json' ? [{ data: objectData }] : objectData
+          //log("Really it was not a json ? \n", error)
+          resultMessage = format == 'json' ? [{ data: objectData }] : objectData
           }
         }
         if (!resultMessage)
