@@ -128,7 +128,7 @@ module.exports = {
         let found = []
         //TODO now there is a preset deep level search, but this level should be parametrized
         found.push(
-            await Source.find({
+            ...(await Source.find({
                 "features": {
                     $elemMatch: {
                         "geometry.coordinates": {
@@ -144,8 +144,8 @@ module.exports = {
                         }
                     }
                 }
-            }),
-            await Source.find({
+            })),
+            ...(await Source.find({
                 "features": {
                     $elemMatch: {
                         "geometry.coordinates": {
@@ -159,8 +159,8 @@ module.exports = {
                         }
                     }
                 }
-            }),
-            await Source.find({
+            })),
+            ...(await Source.find({
                 "features": {
                     $elemMatch: {
                         "geometry.coordinates": {
@@ -172,8 +172,8 @@ module.exports = {
                         }
                     }
                 }
-            }),
-            await Source.find({
+            })),
+            ...(await Source.find({
                 "features": {
                     $elemMatch: {
                         "geometry.coordinates": {
@@ -183,7 +183,7 @@ module.exports = {
                         }
                     }
                 }
-            }),
+            })),
         )
         return found
     },
