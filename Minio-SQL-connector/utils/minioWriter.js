@@ -127,6 +127,53 @@ module.exports = {
     }
   },
 
+  getTypeRecursive(obj) {
+    if (!Array.isArray(obj))
+      for (let key in obj)
+        if (Array.isArray())
+          type = "array"//this.getTypeRecurssive(obj[key])
+        else
+          switch (type = obj[key]) {
+            case "number": query = query + "INTEGER,"; break;
+            case "string": query = query + "TEXT,"; break;
+            case "array": query = query + this.getTypeRecursive(obj[key]); break; // e.g. INTEGER[]
+            case "object": query = query + "JSONB,"; break;
+            case "boolean": query = query + "BOOLEAN"; break;
+          }
+  },
+
+  createTable(table, obj) {
+    let query = "CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL" //, type
+    if (typeof obj == "string") {
+      log("Now parsing")
+      obj = JSON.parse(obj)
+    }
+    if (!Array.isArray(obj))
+      for (let key in obj)
+        if (Array.isArray(obj[key]))
+          query = query + this.getTypeRecursive(obj[key])
+        else
+          switch (typeof obj[key]) {
+            case "number": query = query + ", " + key + " INTEGER"; break;
+            case "string": query = query + ", " + key + " TEXT"; break;
+            //case "array": query = query + this.getTypeRecursive(obj[key]); break; // e.g. INTEGER[]
+            case "object": query = query + ", " + key + " JSONB"; break;
+            case "boolean": query = query + ", " + key + " BOOLEAN"; break;
+          }
+    query = query + ", record JSONB)"
+    //if (Array.isArray(obj))
+    //  for (let )
+    return query
+  },
+
+  getKeys(str){
+    str.split("id SERIAL PRIMARY KEY, name TEXT NOT NULL")[1].split(", record JSONB)")[0].split(",")
+  },
+
+  getValues(){
+
+  },
+
   async insertInDBs(newObject, record, align) {
     log("Insert in DBs ", record?.s3?.object?.key || record.name)
     let csv = false
@@ -155,6 +202,12 @@ module.exports = {
     //log("Before postgre query", common.minify(record?.s3?.object))
     //log(common.minify(JSON.stringify(jsonStringified || common.cleaned(newObject))))
     let queryName = record?.s3?.object?.key || record.name
+    let queryTable = this.createTable(table)
+    let data = (jsonStringified || common.cleaned(newObject))
+    if (typeof data != "string")
+      data = JSON.stringify(data)
+    //let comp1 = JSON.stringify(record)
+    //console.debug(data.substring(0,10),"...\n", comp1.substring(0,10), "...")
     //log("Query name", queryName)
     //queryName.replace(/ /g, '');
 
@@ -162,7 +215,15 @@ module.exports = {
       if (err) {
         log("ERROR searching object in DB");
         log(err);
+
+        //new
+        //this.client.query(queryTable, (err, res) => {
+        //
+
+        //old
         this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)", (err, res) => {
+        //
+
           if (err) {
             log("ERROR creating table");
             log(err);
@@ -170,7 +231,17 @@ module.exports = {
             return;
           }
           //log(common.minify(res))
-          this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}')`, (err, res) => {
+
+          //old
+          this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}')`, (err, res) => {
+          //
+
+          //new
+          //this.client.query(`INSERT INTO ${table} (name, ${this.getKeys(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', ${this.getValues(jsonStringified || common.cleaned(newObject))}, '${JSON.stringify(record)}')`, (err, res) => {
+          //or
+          //this.client.query(`INSERT INTO ${table} (name, ${this.getValues(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}')`, (err, res) => {
+          //
+
             if (err) {
               log("ERROR inserting object in DB");
               log(err);
@@ -199,7 +270,7 @@ module.exports = {
       }
       if (res.rows[0]) {
         log("Objects found \n ")//, common.minify(res.rows));
-        this.client.query(`UPDATE ${table} SET data = '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', record = '${JSON.stringify(record)}'  WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
+        this.client.query(`UPDATE ${table} SET data = '${data}', record = '${JSON.stringify(record)}'  WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
           if (err) {
             log("ERROR updating object in DB");
             log(err);
@@ -212,7 +283,7 @@ module.exports = {
         });
       }
       else
-        this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}' )`, (err, res) => {
+        this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}' )`, (err, res) => {
           if (err) {
             log("ERROR inserting object in DB");
             log(err);

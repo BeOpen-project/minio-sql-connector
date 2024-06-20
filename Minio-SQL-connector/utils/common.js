@@ -23,8 +23,18 @@ module.exports = {
     return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
   },
 
-  urlEncode(bucket){
+  urlEncode(bucket) {
     return bucket.replaceAll("-", "")
+  },
+
+  deleteSpaces(obj) {
+    if (obj) {
+      while (obj[0] == " ")
+        obj = obj.substring(1)
+      while (obj[obj.length - 1] == " ")
+        obj = obj.substring(0, obj.length - 1)
+    }
+    return obj
   },
 
   convertCSVtoJSON(csvData) {
@@ -46,7 +56,7 @@ module.exports = {
       const currentLine = lines[i].trim().split(possibleHeaders[0].length > possibleHeaders[1].length ? "," : ";");
       //console.debug(this.minify(currentLine))
       for (let j = 0; j < headers.length; j++)
-        obj[headers[j]] = currentLine[j]?.replace(/['"]/g, '');
+        obj[this.deleteSpaces(headers[j].replaceAll(/['"]/g, ''))] = this.deleteSpaces(currentLine[j]?.replaceAll(/['"]/g, ''));
       results.push(obj);
       //console.debug(this.minify(obj))
     }
@@ -57,19 +67,22 @@ module.exports = {
   },
 
   cleaned(obj) {
-    //return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"\r\n\s]/g, '');
-    return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"]/g, '');
+    //console.log(typeof obj != "string" ? JSON.stringify(obj) : obj)
+    //return obj
+    //return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"\r\n\s]/g, ''); /['"\r\n]/g /['"]/g
+    //return JSON.stringify(JSON.parse((typeof obj != "string" ? JSON.stringify(obj) : obj).replace( /['\r\n]/g, '')));
+    return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['\r\n]/g, '')//.replaceAll('"\"a\""', '"a"') //.replaceAll('"\\"', '"').replaceAll('\\""', '"');
   },
 
   isRawQuery(obj) {
     const keys = Object.keys(obj);
-    if (keys.length !== 1) 
+    if (keys.length !== 1)
       return false;
     return obj.value;
   },
 
-  checkConfig(configIn){
-    
+  checkConfig(configIn) {
+
     if (!configIn.queryAllowedExtensions) configIn.queryAllowedExtensions = ["csv", "json", "geojson"]
     return configIn
   }
