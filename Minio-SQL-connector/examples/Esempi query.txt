@@ -1,6 +1,7 @@
 Da postman
 
-{"query":"SELECT * FROM json, jsonb_array_elements(data) AS element WHERE element->>'a' = 'a3'"}
+{"query":"SELECT * FROM nomeBucket, LATERAL (SELECT jsonb_array_elements(data) AS element WHERE jsonb_typeof(data) = 'array' UNION ALL SELECT data AS element WHERE jsonb_typeof(data) = 'object') AS subquery WHERE subquery.element->>'a' = 'a3';
+"}
 {"query":"CREATE TABLE json (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)"}
 {"query":"CREATE TABLE nome-bucket (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data JSONB)"}
 {"query":"SELECT * FROM nome-bucket WHERE name = 'email/nome-tool/nome-file'"}
