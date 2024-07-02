@@ -189,7 +189,7 @@ module.exports = {
     },
 
     async simpleQuery(query) {
-        console.debug(result)
+        console.debug(query)
         let result = await Source.find(query)
         console.debug(result)
         for (let obj of result) {
