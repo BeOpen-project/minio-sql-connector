@@ -13,6 +13,26 @@ FROM example_table, jsonb_array_elements(data) AS array_element,
      jsonb_each(array_element) AS nested_object
 WHERE nested_object.value->>'a' = 'a3';
 
+Query CSV
+SELECT * 
+FROM cartagena, 
+	LATERAL (
+		SELECT jsonb_array_elements(data) AS element 
+		WHERE jsonb_typeof(data) = 'array' 
+		UNION ALL SELECT data AS element 
+		WHERE jsonb_typeof(data) = 'object'
+	) AS subquery 
+WHERE subquery.element->>'id_amat' = '9001'
+
+Query GEOJSON
+SELECT *
+FROM cartagena, 
+     LATERAL (
+         SELECT jsonb_array_elements(data->'features') AS element 
+         WHERE jsonb_typeof(data->'features') = 'array'
+     ) AS subquery
+WHERE subquery.element->'properties'->>'fid' = '11';
+
 in index.js, per eseguire query su tutte le tabelle
 
     client.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'", (err, res) => {
