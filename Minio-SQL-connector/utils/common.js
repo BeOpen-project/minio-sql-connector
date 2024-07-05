@@ -31,12 +31,16 @@ module.exports = {
       csv = csv + obj[key] + ";"
     csv = csv.substring(0, csv.length - 1)
 
-    return new ReadableStream({
+    return csv
+
+    const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(csv);
         controller.close();
       }
     });
+
+    return stream
   },
 
   parseJwt(token) {
