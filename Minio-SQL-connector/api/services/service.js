@@ -1,6 +1,6 @@
 const Source = require('../models/source')
 const common = require('../../utils/common')
-const { sleep } = require('../../utils/common')
+const { sleep, json2csv } = require('../../utils/common')
 const { Client } = require('pg');
 const config = require('../../config')
 const { minioConfig, postgreConfig, delays, queryAllowedExtensions } = config
@@ -189,9 +189,9 @@ module.exports = {
     },
 
     async simpleQuery(query) {
-        console.debug(query)
+        //console.debug(query)
         let result = await Source.find(query)
-        console.debug(result)
+        //console.debug(result)
         for (let obj of result) {
             obj.fileName = obj.name.split("/")[obj.name.split("/").lenght - 2]
             obj.path = obj.name
@@ -245,7 +245,7 @@ module.exports = {
                 return;
             }
             else {
-                response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)))
+                response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)).map(obj => obj.element && obj.name.split(".").pop == "csv" ? {...obj, element : json2csv(obj.element)} : obj))
                 console.log(res.rows);
                 console.log("Query sql finished")
             }

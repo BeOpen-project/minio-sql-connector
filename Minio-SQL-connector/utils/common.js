@@ -19,6 +19,23 @@ module.exports = {
     }
   },
 
+  json2csv(obj) {
+    let csv = ""
+
+    let firstline = obj.shift()
+
+    for (let key in firstline)
+      csv = csv + key + ";"
+    csv = csv.substring(0, csv.length - 1)
+
+    for (let o of obj) {
+      for (let key in o)
+        csv = csv + o[key] + ";"
+      csv = csv.substring(0, csv.length - 1)
+    }
+    return csv
+  },
+
   parseJwt(token) {
     return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
   },
