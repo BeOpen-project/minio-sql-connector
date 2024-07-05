@@ -20,19 +20,35 @@ module.exports = {
   },
 
   json2csv(obj) {
-    console.debug("json2csv")
-    let csv = ""
+    // Initialize CSV string
+    let csv = "";
 
-    for (let key in obj)
-      csv = csv + key + ";"
-    csv = csv.substring(0, csv.length - 1)+"\r\n"
+    // Get all keys from the object
+    const keys = Object.keys(obj);
 
-    for (let key in obj)
-      csv = csv + obj[key] + ";"
-    csv = csv.substring(0, csv.length - 1)
+    // Construct header row
+    csv += keys.join(",") + "\r\n";
 
-    return csv
+    // Construct data row
+    const values = keys.map(key => {
+      let value = obj[key];
+
+      // If the value is an object or array, stringify it
+      if (typeof value === 'object' && value !== null) {
+        value = JSON.stringify(value);
+      }
+
+      // Escape double quotes if necessary
+      value = value.toString().replace(/"/g, '""');
+
+      return `"${value}"`;
+    });
+
+    csv += values.join(",") + "\r\n";
+
+    return csv;
   },
+
 
   parseJwt(token) {
     return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
