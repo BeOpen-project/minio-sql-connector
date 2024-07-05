@@ -25,11 +25,11 @@ module.exports = {
 
     for (let key in obj)
       csv = csv + key + ";"
-    csv = csv.substring(0, csv.length - 1) + "\r\n"
+    csv = [csv.substring(0, csv.length - 1)] 
 
     for (let key in obj)
-      csv = csv + obj[key] + ";"
-    csv = csv.substring(0, csv.length - 1)
+      csv[1] = csv[1] + obj[key] + ";"
+    csv[1] = csv[1].substring(0, csv.length - 1)
 
     return csv
 
