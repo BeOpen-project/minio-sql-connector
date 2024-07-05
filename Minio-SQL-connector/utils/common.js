@@ -20,6 +20,7 @@ module.exports = {
   },
 
   json2csv(obj) {
+    console.debug("json2csv")
     let csv = ""
 
     let firstline = obj.shift()

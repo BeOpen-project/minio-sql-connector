@@ -245,7 +245,7 @@ module.exports = {
                 return;
             }
             else {
-                response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)).map(obj => obj.element && obj.name.split(".").pop == "csv" ? {...obj, element : json2csv(obj.element)} : obj))
+                response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)).map(obj => obj.element && obj.name.split(".").pop() == "csv" ? {...obj, element : json2csv(obj.element)} : obj))
                 console.log(res.rows);
                 console.log("Query sql finished")
             }
