@@ -23,17 +23,14 @@ module.exports = {
     console.debug("json2csv")
     let csv = ""
 
-    let firstline = obj.shift()
-
-    for (let key in firstline)
+    for (let key in obj)
       csv = csv + key + ";"
     csv = csv.substring(0, csv.length - 1)
 
-    for (let o of obj) {
-      for (let key in o)
-        csv = csv + o[key] + ";"
-      csv = csv.substring(0, csv.length - 1)
-    }
+    for (let key in obj)
+      csv = csv + obj[key] + ";"
+    csv = csv.substring(0, csv.length - 1)
+
     return csv
   },
 
