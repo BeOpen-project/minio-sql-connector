@@ -20,7 +20,7 @@ module.exports = {
   },
 
   json2csv(obj) {
-    return obj
+    return JSON.stringify(obj)
     console.debug("json2csv")
     let csv = ""
 
