@@ -36,6 +36,6 @@ jobs:
               uses: docker/build-push-action@v5
               with:
                 context: .
-                file: ./Minio-SQL-connector/Dockerfile
+                file: ./minio-sql-connector-dockerfile
                 push: true
                 tags: ${{ secrets.DOCKER_USERNAME }}/minio_sql_connector:latest
