@@ -12,9 +12,18 @@ module.exports = {
     queryMongo: async (req, res) => {
         console.log("Query mongo")
         console.log(req.query, req.headers.visibility)
-        if (common.isRawQuery(req.query))
-            return res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
-        res.send(await service.mongoQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
+        //if (common.isRawQuery(req.query))
+        //return res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
+        let rawQuery = await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)
+        if (rawQuery && !Array.isArray(rawQuery))
+            rawQuery = [rawQuery]
+        let mongoQuery = await service.mongoQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)
+        if (mongoQuery && !Array.isArray(mongoQuery))
+            mongoQuery = [mongoQuery]
+        if (rawQuery && mongoQuery)
+            res.send(rawQuery.concat(mongoQuery))
+        else
+            res.send(rawQuery || mongoQuery)
         console.log("Query mongo finished")
     },
 
