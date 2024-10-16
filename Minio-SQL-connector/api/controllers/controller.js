@@ -14,10 +14,14 @@ module.exports = {
         console.log(req.query, req.headers.visibility)
         //if (common.isRawQuery(req.query))
         //return res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
-        let rawQuery = await service.rawQuery({...req.query, format : "Object"}, req.body.prefix, req.body.bucketName, req.headers.visibility)
+        let queryRaw = JSON.parse(JSON.stringify(req.query))
+        queryRaw.format = "Object"
+        let queryMongo = JSON.parse(JSON.stringify(req.query))
+        queryMongo.format = "JSON"
+        let rawQuery = await service.rawQuery(queryRaw, req.body.prefix, req.body.bucketName, req.headers.visibility)
         if (rawQuery && !Array.isArray(rawQuery))
             rawQuery = [rawQuery]
-        let mongoQuery = await service.mongoQuery({...req.query, format : "JSON"}, req.body.prefix, req.body.bucketName, req.headers.visibility)
+        let mongoQuery = await service.mongoQuery(queryMongo, req.body.prefix, req.body.bucketName, req.headers.visibility)
         if (mongoQuery && !Array.isArray(mongoQuery))
             mongoQuery = [mongoQuery]
         if (rawQuery && mongoQuery)
