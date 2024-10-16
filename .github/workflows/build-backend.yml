@@ -6,13 +6,13 @@ on:
       - main
     paths:
       - 'Minio-SQL-connector/**'
-    #  - '.github/**'
+      - '.github/**'
   pull_request:
     branches:
       - main
     paths:
       - 'Minio-SQL-connector/**'
-    #  - '.github/**'
+      - '.github/**'
 
 jobs:
 
@@ -36,6 +36,6 @@ jobs:
               uses: docker/build-push-action@v5
               with:
                 context: .
-                file: ./Dockerfile
+                file: ./Minio-SQL-connector/Dockerfile
                 push: true
                 tags: ${{ secrets.DOCKER_USERNAME }}/minio_sql_connector:latest
