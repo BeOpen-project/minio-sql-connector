@@ -14,20 +14,20 @@ module.exports = {
         console.log(req.query, req.headers.visibility)
         //if (common.isRawQuery(req.query))
         //return res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
-        let queryRaw = JSON.parse(JSON.stringify(req.query))
-        queryRaw.format = "Object"
-        let queryMongo = JSON.parse(JSON.stringify(req.query))
-        queryMongo.format = "JSON"
-        let rawQuery = await service.rawQuery(queryRaw, req.body.prefix, req.body.bucketName, req.headers.visibility)
-        if (rawQuery && !Array.isArray(rawQuery))
-            rawQuery = [rawQuery]
-        let mongoQuery = await service.mongoQuery(queryMongo, req.body.prefix, req.body.bucketName, req.headers.visibility)
-        if (mongoQuery && !Array.isArray(mongoQuery))
-            mongoQuery = [mongoQuery]
-        if (rawQuery && mongoQuery)
-            res.send(rawQuery.concat(mongoQuery))
+        let objectQuerySet = JSON.parse(JSON.stringify(req.query))
+        objectQuerySet.format = "Object"
+        let JSONQuerySet = JSON.parse(JSON.stringify(req.query))
+        JSONQuerySet.format = "JSON"
+        let objectQuery = await service.mongoQuery(objectQuerySet, req.body.prefix, req.body.bucketName, req.headers.visibility)
+        if (objectQuery && !Array.isArray(objectQuery))
+            objectQuery = [objectQuery]
+        let JSONQuery = await service.mongoQuery(JSONQuerySet, req.body.prefix, req.body.bucketName, req.headers.visibility)
+        if (JSONQuery && !Array.isArray(JSONQuery))
+            JSONQuery = [JSONQuery]
+        if (JSONQuery && objectQuery)
+            res.send(JSONQuery.concat(objectQuery))
         else
-            res.send(rawQuery || mongoQuery)
+            res.send(JSONQuery || objectQuery)
         console.log("Query mongo finished")
     },
 
