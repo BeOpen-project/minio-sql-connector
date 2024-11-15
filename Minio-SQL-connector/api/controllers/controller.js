@@ -31,7 +31,7 @@ module.exports = {
         return "Query mongo finished"
     },
 
-    querySQL: async (req, res) => {
+    querySQL: async (req, res, next) => {
         console.log("Query sql")
         if (req.body.mongoQuery)
             return next(req,res)
