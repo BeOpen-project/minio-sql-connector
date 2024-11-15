@@ -7,7 +7,7 @@ const router = express.Router()
 //const upload = multer();
 const { auth } = require("../middlewares/auth.js")
 
-router.post(encodeURI("/query"), auth, controller.querySQL)
+router.post(encodeURI("/query"), auth, controller.querySQL, controller.queryMongo)
 router.get(encodeURI("/query"), auth, controller.queryMongo)
 router.get(encodeURI("/minio/listObjects"), auth, controller.minioListObjects)
 router.put(encodeURI("/query"), auth, controller.sync)

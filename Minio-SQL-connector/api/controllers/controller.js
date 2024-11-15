@@ -34,7 +34,7 @@ module.exports = {
     querySQL: async (req, res) => {
         console.log("Query sql")
         if (req.body.mongoQuery)
-            return this.queryMongo(req,res)
+            return next(req,res)
         if (!req.body.query)
             return res.status(400).send("Missing query")
         const requestData = req.body.query;
