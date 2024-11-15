@@ -2,17 +2,6 @@ const service = require("../services/service.js")
 const common = require("../../utils/common.js")
 module.exports = {
 
-    querySQL: async (req, res) => {
-        console.log("Query sql")
-        if (req.body.mongoQuery)
-            return this.queryMongo(req,res)
-        if (!req.body.query)
-            return res.status(400).send("Missing query")
-        const requestData = req.body.query;
-        console.log(requestData)
-        service.querySQL(res, req.body.query, req.body.prefix, req.body.bucketName, req.headers.visibility)
-    },
-
     queryMongo: async (req, res) => {
         console.log("Query mongo")
         console.log(req.query, req.headers.visibility, req.body)
@@ -40,6 +29,17 @@ module.exports = {
         }
         console.log("Query mongo finished")
         return "Query mongo finished"
+    },
+
+    querySQL: async (req, res) => {
+        console.log("Query sql")
+        if (req.body.mongoQuery)
+            return this.queryMongo(req,res)
+        if (!req.body.query)
+            return res.status(400).send("Missing query")
+        const requestData = req.body.query;
+        console.log(requestData)
+        service.querySQL(res, req.body.query, req.body.prefix, req.body.bucketName, req.headers.visibility)
     },
 
     sync: async (req, res) => {
