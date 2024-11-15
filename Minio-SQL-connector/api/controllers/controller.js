@@ -4,6 +4,10 @@ module.exports = {
 
     querySQL: async (req, res) => {
         console.log("Query sql")
+        if (req.body.mongoQuery)
+            return this.queryMongo(req,res)
+        if (!req.body.query)
+            return res.status(400).send("Missing query")
         const requestData = req.body.query;
         console.log(requestData)
         service.querySQL(res, req.body.query, req.body.prefix, req.body.bucketName, req.headers.visibility)
@@ -11,14 +15,14 @@ module.exports = {
 
     queryMongo: async (req, res) => {
         console.log("Query mongo")
-        console.log(req.query, req.headers.visibility)
+        console.log(req.query, req.headers.visibility, req.body)
         if (common.isRawQuery(req.query))
             res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
         else {
             if (req.query.format == "JSON") {
-                let objectQuerySet = JSON.parse(JSON.stringify(req.query))
+                let objectQuerySet = JSON.parse(JSON.stringify(req.body.mongoQuery || req.query))
                 objectQuerySet.format = "Object"
-                let JSONQuerySet = JSON.parse(JSON.stringify(req.query))
+                let JSONQuerySet = JSON.parse(JSON.stringify(req.body.mongoQuery || req.query))
                 JSONQuerySet.format = "JSON"
                 let objectQuery = await service.mongoQuery(objectQuerySet, req.body.prefix, req.body.bucketName, req.headers.visibility)
                 if (objectQuery && !Array.isArray(objectQuery))
@@ -32,7 +36,7 @@ module.exports = {
                     res.send(JSONQuery || objectQuery)
             }
             else
-                res.send(await service.mongoQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
+                res.send(await service.mongoQuery(req.body.mongoQuery || req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
         }
         console.log("Query mongo finished")
     },
