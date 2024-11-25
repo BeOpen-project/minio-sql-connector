@@ -27,9 +27,9 @@ module.exports = {
   parseCompatibilityMode : 0,
   mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
   authConfig: {
-    idmHost: "https://platform.beopen-dep.it/auth",
+    idmHost: "https://platform.beopendep.it/auth",
     clientId: "",
-    userInfoEndpoint: "https://platform.beopen-dep.it/api/user",
+    userInfoEndpoint: "https://platform.beopendep.it/api/user",
     disableAuth: false,
     authProfile: "oidc",
     authRealm: "",

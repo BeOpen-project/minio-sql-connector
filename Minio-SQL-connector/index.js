@@ -4,7 +4,7 @@ console.log(config.queryAllowedExtensions)
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
-const port = 3000;
+const port = config.port || 3000;
 const mongoose = require("mongoose");
 const cors = require('cors');
 const routes = require ("./api/routes/router")
