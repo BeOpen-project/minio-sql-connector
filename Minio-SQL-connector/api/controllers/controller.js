@@ -4,9 +4,11 @@ const common = require("../../utils/common.js")
 const queryMongo = async (req, res) => {
     console.log("Query mongo")
     console.log(req.query, req.headers.visibility, req.body)
+    console.log("rawquery", common.isRawQuery(req.query))
     if (common.isRawQuery(req.query))
         res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
     else {
+        console.debug("format ",req.query.format)
         if (req.query.format == "JSON") {
             let objectQuerySet = JSON.parse(JSON.stringify(req.body.mongoQuery || req.query))
             objectQuerySet.format = "Object"
@@ -24,7 +26,7 @@ const queryMongo = async (req, res) => {
                 res.send(JSONQuery || objectQuery)
         }
         else
-            res.send(await service.mongoQuery(req.body.mongoQuery || req.query, req.body.prefix, req.body.bucketName, req.headers.visibility))
+            res.send(await service.mongoQuery({...req.body.mongoQuery, ...req.query}, req.body.prefix, req.body.bucketName, req.headers.visibility))
     }
     console.log("Query mongo finished")
     return "Query mongo finished"

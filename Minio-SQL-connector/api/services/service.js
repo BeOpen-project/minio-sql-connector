@@ -119,6 +119,8 @@ module.exports = {
 
     async exampleQueryGeoJson(query) {
 
+        console.debug("example query geojson: query ", query)
+
         //let key
         //for (let k in query)
         //    key = k
@@ -200,17 +202,22 @@ module.exports = {
             }))
         )
 
-        console.debug("geo query\n",[`properties.${key}`], "\n | \n",  query[key])
+        for (let key in query) {
+            console.debug("geo query\n", {
+                [`properties.${key}`]: query[key]
+            })
 
-        for (let key in query)
             found.push(
                 ...(await Source.find({
                     "features": {
                         $elemMatch: {
-                            [`properties.${key}`]: query[key]
+                            [`properties.${key}`]: JSON.parse(query[key])
                         }
                     }
                 })))
+        }
+
+        console.debug(found)
         return found
     },
 
@@ -226,9 +233,11 @@ module.exports = {
     },
 
     async mongoQuery(query, prefix, bucket, visibility) {
+        console.debug("format ", query.format)
         let format = query.format?.toLowerCase()
         if (format)
             delete query["format"]
+        console.debug("format ", format)
         //query.name = new RegExp("^" + prefix, 'i')
         switch (format) {
             case "geojson": return (await this.exampleQueryGeoJson(query)).filter(obj => objectFilter(obj, prefix, bucket, visibility))//obj.name.includes(prefix))
