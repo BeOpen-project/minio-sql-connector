@@ -32,7 +32,6 @@ async function sync() {
         syncing = true
         let objects = []
         let buckets = await minioWriter.listBuckets()
-        //console.debug(buckets)
         let bucketIndex = 1
         for (let bucket of buckets) {
             let bucketObjects = await minioWriter.listObjects(bucket.name)
@@ -43,7 +42,6 @@ async function sync() {
                     console.debug("Bucket ", bucketIndex, " of ", buckets.length)
                     console.debug("Scanning object ", index++, " of ", bucketObjects.length, ",", obj.name)
                     let extension = obj.name.split(".").pop()
-                    //console.log(queryAllowedExtensions)
                     let isAllowed = (queryAllowedExtensions == "all" || queryAllowedExtensions.includes(extension))
                     if (obj.size && obj.isLatest && isAllowed) {//} && !obj.isDeleteMarker) {
                         let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
@@ -73,12 +71,11 @@ if (config.syncInterval)
     setInterval(sync, config.syncInterval);
 
 function bucketIs(record, bucket) {
-    //console.debug(record, bucket)
     return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
 }
 
 function objectFilter(obj, prefix, bucket, visibility) {
-    if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj?.name?.includes(prefix))) 
+    if (visibility == "private" && (obj.record?.name?.includes(prefix) || obj?.name?.includes(prefix)))
         return true
     if (visibility == "shared" && bucketIs(obj?.record, bucket) && obj?.name?.includes(bucket?.toUpperCase() + " SHARED Data/"))
         return true
@@ -128,6 +125,23 @@ module.exports = {
         let found = []
         //TODO now there is a preset deep level search, but this level should be parametrized
         found.push(
+            ...(await Source.find({
+                "features": {
+                    $elemMatch: {
+                        "properties.query.key": {
+                            $elemMatch: {
+                                $elemMatch: {
+                                    $elemMatch: {
+                                        $elemMatch: {
+                                            $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            })),
             ...(await Source.find({
                 "features": {
                     $elemMatch: {
@@ -183,20 +197,31 @@ module.exports = {
                         }
                     }
                 }
-            })),
+            }))
         )
+
+        console.debug("geo query\n",[`properties.${key}`], "\n | \n",  query[key])
+
+        for (let key in query)
+            found.push(
+                ...(await Source.find({
+                    "features": {
+                        $elemMatch: {
+                            [`properties.${key}`]: query[key]
+                        }
+                    }
+                })))
         return found
     },
 
     async simpleQuery(query) {
-        //console.debug(query)
         let result = await Source.find(query)
-        //console.debug(result)
         for (let obj of result) {
             obj.fileName = obj.name.split("/")[obj.name.split("/").lenght - 2]
             obj.path = obj.name
             obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
         }
+        console.log(result)
         return result
     },
 
@@ -245,7 +270,7 @@ module.exports = {
                 return;
             }
             else {
-                response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)).map(obj => obj.element && obj.name.split(".").pop() == "csv" ? {...obj, element : json2csv(obj.element)} : obj))
+                response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)).map(obj => obj.element && obj.name.split(".").pop() == "csv" ? { ...obj, element: json2csv(obj.element) } : obj))
                 console.log(res.rows);
                 console.log("Query sql finished")
             }
