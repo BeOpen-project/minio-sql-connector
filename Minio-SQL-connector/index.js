@@ -15,3 +15,4 @@ app.use(bodyParser.json());
 app.use(config.basePath || "/api", routes);
 app.listen(port, () => {console.log(`Server listens on http://localhost:${port}`);});
 mongoose.connect(config.mongo, { useNewUrlParser: true }).then(() => {console.log("Connected to mongo")})
+console.log(`Node.js version: ${process.version}`);

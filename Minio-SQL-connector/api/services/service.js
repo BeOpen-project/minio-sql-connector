@@ -125,13 +125,57 @@ module.exports = {
         //for (let k in query)
         //    key = k
         let found = []
+        let propertiesQuery = {}
         //TODO now there is a preset deep level search, but this level should be parametrized
-        found.push(
-            ...(await Source.find({
-                "features": {
-                    $elemMatch: {
-                        "properties.query.key": {
-                            $elemMatch: {
+
+        for (let key in query)
+            if (key != "coordinates")
+                propertiesQuery[`properties.${key}`] = query[key]
+
+        if (query.coordinates)
+            found.push(
+                ...(await Source.find({
+                    "features": {
+                        $elemMatch: {
+                            //"properties.query.key": {
+                            ...propertiesQuery,
+                            "geometry.coordinates": {
+                                $elemMatch: {
+                                    $elemMatch: {
+                                        $elemMatch: {
+                                            $elemMatch: {
+                                                $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })),
+                ...(await Source.find({
+                    "features": {
+                        $elemMatch: {
+                            ...propertiesQuery,
+                            "geometry.coordinates": {
+                                $elemMatch: {
+                                    $elemMatch: {
+                                        $elemMatch: {
+                                            $elemMatch: {
+                                                $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })),
+                ...(await Source.find({
+                    "features": {
+                        $elemMatch: {
+                            ...propertiesQuery,
+                            "geometry.coordinates": {
                                 $elemMatch: {
                                     $elemMatch: {
                                         $elemMatch: {
@@ -142,30 +186,12 @@ module.exports = {
                             }
                         }
                     }
-                }
-            })),
-            ...(await Source.find({
-                "features": {
-                    $elemMatch: {
-                        "geometry.coordinates": {
-                            $elemMatch: {
-                                $elemMatch: {
-                                    $elemMatch: {
-                                        $elemMatch: {
-                                            $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            })),
-            ...(await Source.find({
-                "features": {
-                    $elemMatch: {
-                        "geometry.coordinates": {
-                            $elemMatch: {
+                })),
+                ...(await Source.find({
+                    "features": {
+                        $elemMatch: {
+                            ...propertiesQuery,
+                            "geometry.coordinates": {
                                 $elemMatch: {
                                     $elemMatch: {
                                         $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
@@ -174,50 +200,34 @@ module.exports = {
                             }
                         }
                     }
-                }
-            })),
-            ...(await Source.find({
-                "features": {
-                    $elemMatch: {
-                        "geometry.coordinates": {
-                            $elemMatch: {
+                })),
+                ...(await Source.find({
+                    "features": {
+                        $elemMatch: {
+                            ...propertiesQuery,
+                            "geometry.coordinates": {
                                 $elemMatch: {
+                                    //$gte: Number(query.coordinates) - 0.0000001,
+                                    //$lte: Number(query.coordinates) + 0.0000001
                                     $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
                                 }
                             }
                         }
                     }
-                }
-            })),
-            ...(await Source.find({
+                }))
+            )
+
+        else
+            found = await Source.find({
                 "features": {
                     $elemMatch: {
-                        "geometry.coordinates": {
-                            $elemMatch: {
-                                $eq: Number(query.coordinates) //$elemMatch: { $eq: Number(query[key]) }
-                            }
-                        }
+                        ...propertiesQuery
                     }
                 }
-            }))
-        )
-
-        for (let key in query) {
-            console.debug("geo query\n", {
-                [`properties.${key}`]: query[key]
             })
-
-            found.push(
-                ...(await Source.find({
-                    "features": {
-                        $elemMatch: {
-                            [`properties.${key}`]: JSON.parse(query[key])
-                        }
-                    }
-                })))
-        }
-
-        console.debug(found)
+        //console.debug("Found : ", found.length, " items")
+        //console.debug(found)
+        //console.debug({ ...propertiesQuery })
         return found
     },
 
@@ -249,6 +259,7 @@ module.exports = {
     },
 
     async rawQuery(query, prefix, bucket, visibility) {
+        console.log("Raw query")
         //query.name = new RegExp("^" + prefix, 'i')
         let objects = []
         if (visibility == "public")
@@ -264,7 +275,7 @@ module.exports = {
                 console.error(error)
             }
         }
-        return objects.filter(obj => typeof obj.raw == "string" ? objectFilter(obj, prefix, bucket, visibility) && obj.raw.includes(query.value) : objectFilter(obj, prefix, bucket, visibility) && JSON.stringify(obj.raw).includes(query.value))
+        return objects.filter(obj => typeof obj.raw == "string" ? objectFilter(obj, prefix, bucket, visibility) && (!query.value || obj.raw.includes(query.value)) : objectFilter(obj, prefix, bucket, visibility) && (!query.value || JSON.stringify(obj.raw).includes(query.value)))
         //return objects.filter(obj => typeof obj.raw == "string" ? obj.record.name.includes(prefix) && obj.raw.includes(query.value) : obj.record.name.includes(prefix) && JSON.stringify(obj.raw).includes(query.value))
     },
 

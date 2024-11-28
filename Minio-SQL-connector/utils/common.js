@@ -1,4 +1,16 @@
-﻿
+﻿function objectCheck(objs) {
+  for (let obj of objs)
+    for (let key in obj)
+      try {
+        let valueParsed = JSON.parse(obj[key])
+        obj[key] = valueParsed
+      }
+      catch (error) {
+        console.error(error)
+      }
+
+}
+
 module.exports = {
 
   sleep(ms) {
@@ -26,7 +38,7 @@ module.exports = {
 
     for (let key in obj)
       csv = csv + key + ";"
-    csv = [csv.substring(0, csv.length - 1)] 
+    csv = [csv.substring(0, csv.length - 1)]
 
     csv[1] = ""
 
@@ -101,16 +113,25 @@ module.exports = {
     return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['\r\n]/g, '')//.replaceAll('"\"a\""', '"a"') //.replaceAll('"\\"', '"').replaceAll('\\""', '"');
   },
 
+  /*
   isRawQuery(obj) {
     const keys = Object.keys(obj);
     if (keys.length !== 1)
       return false;
     return obj.value;
   },
+  */
 
   checkConfig(configIn) {
 
     if (!configIn.queryAllowedExtensions) configIn.queryAllowedExtensions = ["csv", "json", "geojson"]
     return configIn
+  },
+
+  bodyCheck: async (req, res, next) => {
+    if (Object.keys(req.body.mongoQuery).length == 1 && req.body.mongoQuery[''] == '' || req.body.mongoQuery[''] == '{"$gte":null,"$lte":null}')
+      req.body.mongoQuery = req.query
+    objectCheck([req.body.mongoQuery, req.query])
+    next()
   }
 }
