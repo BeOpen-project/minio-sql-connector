@@ -66,7 +66,8 @@ async function sync() {
     }
 }
 
-sync()
+if(!config.doNotSyncAtStart)
+    sync()
 if (config.syncInterval)
     setInterval(sync, config.syncInterval);
 

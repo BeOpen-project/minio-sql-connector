@@ -22,6 +22,7 @@ module.exports = {
     port: 5432
   },
   syncInterval : 86400000,
+  doNotSyncAtStart : false,
   delays : 1,
   queryAllowedExtensions : ["csv", "json", "geojson"],
   parseCompatibilityMode : 0,

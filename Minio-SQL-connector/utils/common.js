@@ -129,7 +129,9 @@ module.exports = {
   },
 
   bodyCheck: async (req, res, next) => {
-    if (Object.keys(req.body.mongoQuery).length == 1 && req.body.mongoQuery[''] == '' || req.body.mongoQuery[''] == '{"$gte":null,"$lte":null}')
+    if (req?.body?.mongoQuery && (
+      Object.keys(req?.body?.mongoQuery).length == 1 && req.body.mongoQuery[''] == '' ||
+      req.body.mongoQuery[''] == '{"$gte":null,"$lte":null}') || !req.body || !req.body.mongoQuery)
       req.body.mongoQuery = req.query
     objectCheck([req.body.mongoQuery, req.query])
     next()
