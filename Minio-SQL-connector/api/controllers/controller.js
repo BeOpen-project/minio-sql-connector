@@ -1,6 +1,7 @@
 const service = require("../services/service.js")
 const common = require("../../utils/common.js")
 
+
 const queryMongo = async (req, res) => {
     if (req.headers.israwquery)
         return await res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)) && console.log("Raw query finished")
