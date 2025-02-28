@@ -1,4 +1,4 @@
-const config = require("../../config");
+const config = require("../config");
 const path = require("path");
 const fs = require("fs");
 let registredDay = 0;
