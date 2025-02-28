@@ -12,3 +12,5 @@ Trino connector/platform simulator/app.dev.py
 Minio SQL connector/log.txt
 Minio-SQL-connector/log.txt
 config.json
+Minio-SQL-connector/logs/
+Minio-SQL-connector/abs.yml

@@ -1,4 +1,7 @@
 const Source = require('../models/source')
+const Value = require('../models/value')
+const Key = require('../models/key')
+const Entries = require('../models/entries')
 const common = require('../../utils/common')
 const { sleep, json2csv } = require('../../utils/common')
 const { Client } = require('pg');
@@ -30,6 +33,11 @@ async function save(objects) {
 async function sync() {
     if (!syncing) {
         syncing = true
+        await Source.deleteMany({})
+        await Key.deleteMany({})
+        await Value.deleteMany({})
+        await Entries.deleteMany({})
+        //await sleep(10000)
         let objects = []
         let buckets = await minioWriter.listBuckets()
         let bucketIndex = 1
@@ -87,6 +95,19 @@ function objectFilter(obj, prefix, bucket, visibility) {
 }
 
 module.exports = {
+
+    async getKeys(){
+        return await Key.find()
+    },
+
+    async getValues(){
+        return await Value.find()
+    },
+
+    async getEntries(){
+        return await Entries.find()
+    },
+
 
     async exampleQueryCSV(query) {
 

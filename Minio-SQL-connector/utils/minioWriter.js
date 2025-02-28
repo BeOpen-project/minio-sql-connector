@@ -1,13 +1,20 @@
 var Minio = require('minio')
 const common = require('./common.js')
-const { sleep } = common
+const { sleep, getEntries, setType } = common
 const config = require('../config.js')
 const { minioConfig, delays, queryAllowedExtensions } = config
 const Source = require('../api/models/source.js')//TODO divide collections by email and/or bucket
+const Key = require('../api/models/key.js')
+const Entries = require('../api/models/entries.js')
+const Value = require('../api/models/value.js')
 let minioClient = new Minio.Client(minioConfig)
 const fs = require('fs');
 const logFile = 'log.txt';
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+const Log = require('./logger')//.app(module);
+const { Logger } = Log
+const logger = new Logger("miniowriter")
+const log = logger.info
 
 function logSizeChecker() {
   let stats = fs.statSync(logFile)
@@ -24,7 +31,7 @@ function logSizeChecker() {
     });
 }
 
-function log(...m) {
+function log2(...m) {
   console.log(...m)
   if (config.writeLogsOnFile) {
     let args = [...m]
@@ -166,11 +173,11 @@ module.exports = {
     return query
   },
 
-  getKeys(str){
+  getKeys(str) {
     str.split("id SERIAL PRIMARY KEY, name TEXT NOT NULL")[1].split(", record JSONB)")[0].split(",")
   },
 
-  getValues(){
+  getValues() {
 
   },
 
@@ -222,7 +229,7 @@ module.exports = {
 
         //old
         this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)", (err, res) => {
-        //
+          //
 
           if (err) {
             log("ERROR creating table");
@@ -234,13 +241,13 @@ module.exports = {
 
           //old
           this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}')`, (err, res) => {
-          //
+            //
 
-          //new
-          //this.client.query(`INSERT INTO ${table} (name, ${this.getKeys(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', ${this.getValues(jsonStringified || common.cleaned(newObject))}, '${JSON.stringify(record)}')`, (err, res) => {
-          //or
-          //this.client.query(`INSERT INTO ${table} (name, ${this.getValues(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}')`, (err, res) => {
-          //
+            //new
+            //this.client.query(`INSERT INTO ${table} (name, ${this.getKeys(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', ${this.getValues(jsonStringified || common.cleaned(newObject))}, '${JSON.stringify(record)}')`, (err, res) => {
+            //or
+            //this.client.query(`INSERT INTO ${table} (name, ${this.getValues(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}')`, (err, res) => {
+            //
 
             if (err) {
               log("ERROR inserting object in DB");
@@ -324,12 +331,20 @@ module.exports = {
     if (!jsonParsed)
       log("Empty object of extension ", extension)
 
-    let insertingSource = [extension == "csv" ? { csv: jsonParsed, record, name: record?.s3?.object?.key || record.name } : Array.isArray(jsonParsed) ? { json: jsonParsed, record, name: record?.s3?.object?.key || record.name } : typeof jsonParsed == "object" ? { ...jsonParsed, record, name: record?.s3?.object?.key || record.name } : { raw: jsonParsed, record, name: record?.s3?.object?.key || record.name }]
+    let insertingSource = [
+      extension == "csv" ?
+        { csv: jsonParsed, record, name: record?.s3?.object?.key || record.name } :
+        Array.isArray(jsonParsed) ?
+          { json: jsonParsed, record, name: record?.s3?.object?.key || record.name } :
+          typeof jsonParsed == "object" ?
+            { ...jsonParsed, record, name: record?.s3?.object?.key || record.name } :
+            { raw: jsonParsed, record, name: record?.s3?.object?.key || record.name }
+    ]
     try {
       await Source.insertMany(insertingSource)
     }
     catch (error) {
-      if (!error.errorResponse.message.includes("Document can't have"))
+      if (!error?.errorResponse?.message?.includes("Document can't have"))
         log(error)
       //log("Probably there are some special characters not allowed")
       try {
@@ -341,6 +356,43 @@ module.exports = {
         log(error)
       }
     }
+    logger.debug("before get type")
+    logger.debug(JSON.stringify(jsonParsed).substring(0, 30))
+    //await sleep(100)
+    let type = await setType(extension, jsonParsed) // csv, jsonArray, json, raw
+    let entries
+    logger.debug("type")
+    logger.debug(type)
+    //await sleep(100)
+    if (type != "raw")
+      try {
+        entries = await getEntries(insertingSource, type)
+        log("entries ", entries != undefined)
+        //const { keys, values } = entries
+        //let values = getValues(obj, type)
+        logger.debug("entries\n",JSON.stringify(entries).substring(0,30))
+        //await sleep(100)
+        await Entries.insertMany(entries)
+        await Key.insertMany(entries.map(e => ({key : e.key})))
+        ////await sleep(100)
+        await Value.insertMany(entries.map(e => ({value : typeof e.value == "object" ? JSON.stringify(e.value) : e.value})))
+      }
+      catch (error) {
+        if (!error?.errorResponse?.message?.includes("Document can't have"))
+          log(error)
+        //log("Probably there are some special characters not allowed")
+        try {
+          //const { keys, values } = entries
+          await Entries.insertMany(JSON.parse(JSON.stringify(entries).replace(/\$/g, '')))
+          //await Value.insertMany(JSON.parse(JSON.stringify(values).replace(/\$/g, '')))
+          //log("Indeed")
+        }
+        catch (error) {
+          log("There are problems inserting object in mongo DB")
+          log(error)
+          //await sleep(100)
+        }
+      }
     while (!postgreFinished) {
       await sleep(delays)
       if (!logCounterFlag) {
@@ -383,11 +435,11 @@ module.exports = {
           if (record.s3.object.size)
             await this.insertInDBs(newObject, record, false)
           else
-            console.log("Size is ", record.s3.object.size || 0, " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+            log("Size is ", record.s3.object.size || 0, " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
         else
           await this.deleteInDBs(record)
       else
-        console.log("Size is ", record.s3.object.size || 0, " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+        log("Size is ", record.s3.object.size || 0, " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
 
     })
     poller.on('error', (error) => {

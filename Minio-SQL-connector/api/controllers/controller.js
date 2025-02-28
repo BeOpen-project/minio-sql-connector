@@ -48,6 +48,38 @@ module.exports = {
         querySQL(req, res)
     },
 
+    getValues: async (req, res) => {
+        console.log("values")
+        try {
+            res.send(await service.getValues())
+        }
+        catch (error) {
+            console.error(error)
+            res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
+        }
+    },
+
+    getEntries: async (req, res) => {
+        console.log("values")
+        try {
+            res.send(await service.getEntries())
+        }
+        catch (error) {
+            console.error(error)
+            res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
+        }
+    },
+
+    getKeys: async (req, res) => {
+        console.log("keys")
+        try {
+            res.send(await service.getKeys())
+        }
+        catch (error) {
+            console.error(error)
+            res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
+        }
+    },
 
     sync: async (req, res) => {
         console.log("Sync")
