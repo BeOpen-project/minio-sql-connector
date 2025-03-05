@@ -43,6 +43,132 @@ function log2(...m) {
   }
 }
 
+async function insertUniqueEntries_1(entries) {
+
+  const existingEntries = await Entries.find({ $or: entries });
+  const existingSet = new Set(existingEntries.map(e => `${e.key}:${e.value}`));
+  const newEntries = entries.filter(e => !existingSet.has(`${e.key}:${e.value}`));
+  if (newEntries.length > 0) {
+    await Entries.insertMany(newEntries.map(e => ({ key: e.key, value: typeof e.value == "object" ? JSON.stringify(e.value) : e.value })));
+  } else {
+    logger.info("no entries to insert")
+  }
+}
+
+async function insertUniqueKeys_1(keys) {
+
+  const existingEntries = await Key.find({ $or: keys });
+  const existingSet = new Set(existingEntries.map(e => e.key));
+  const newKeys = keys.filter(e => !existingSet.has(e.key));
+  if (newKeys.length > 0) {
+    try {
+      await Key.insertMany(newKeys, { ordered: false });
+      logger.info(`Inserted ${newKeys.length} new keys`);
+    } catch (error) {
+      if (error.code === 11000) {
+        logger.warn("some keys ignored");
+      } else {
+        throw error;
+      }
+    }
+  } else {
+    logger.info("No keys to insert");
+  }
+  /*
+   const existingEntries = await Key.find({ $or: keys });
+   const existingSet = new Set(existingEntries.map(e => `${e.key}`));
+   const newKeys = keys.filter(e => !existingSet.has(`${e.key}`));
+   if (newKeys.length > 0) {
+     await Key.insertMany(newKeys);
+   } else {
+     logger.info("no keys to insert")
+   }*/
+}
+
+async function insertUniqueValues(values) {
+  for (let value of values)
+    if (!(await Value.find({ value: value.value }))[0])
+      await Value.insertMany([value])
+    else
+      logger.info(value.value, " already exists")
+}
+async function insertUniqueEntries(entries) {
+  for (let entry of entries)
+    if (!(await Entries.find({ value: entry.value, key:entry.key }))[0])
+      await Entries.insertMany([entry])
+    else
+      logger.info(entry, " already exists")
+}
+async function insertUniqueKeys(keys) {
+  for (let key of keys)
+    if (!(await Key.find({ key: key.key }))[0])
+      await Key.insertMany([key])
+    else
+      logger.info(key.key, " already exists")
+}
+
+
+async function insertUniqueValues_1(values) {
+  // Trova i valori già esistenti nel database
+  const existingEntries = await Value.find({ $or: values.map(v => ({ value: v.value })) });
+
+  // Crea un Set con i valori già presenti
+  const existingSet = new Set(existingEntries.map(e => e.value));
+
+  // Filtra i nuovi valori che non esistono già nel database
+  const newValues = values.filter(e => !existingSet.has(e.value));
+  logger.debug(values.length, " | ", newValues.length)
+
+  if (newValues.length > 0) {
+    try {
+      await Value.insertMany(newValues, { ordered: false });
+      logger.info(`Inserted ${newValues.length} new values`);
+    } catch (error) {
+      if (error.code === 11000) {
+        logger.warn(error, newValues, "Some values were ignored due to duplicates");
+      } else {
+        throw error;
+      }
+    }
+  } else {
+    logger.info("No values to insert");
+  }
+}
+
+
+
+async function insertUniqueValues_0(values) {
+  //await Value.insertMany(entries.map(e => ({value : typeof e.value == "object" ? JSON.stringify(e.value) : e.value})))
+  const existingEntries = await Value.find({ $or: values });
+  const existingSet = new Set(existingEntries.map(e => e.value));
+  const newValues = values.filter(e => !existingSet.has(e.value));
+  if (newValues.length > 0) {
+    try {
+      await Value.insertMany(newValues, { ordered: false });
+      logger.info(`Inserted ${newValues.length} new values`);
+    } catch (error) {
+      if (error.code === 11000) {
+        logger.warn("some values ignored");
+      } else {
+        throw error;
+      }
+    }
+  } else {
+    logger.info("No values to insert");
+  }
+
+  /*
+  const existingEntries = await Value.find({ $or: values });
+  const existingSet = new Set(existingEntries.map(e => `${e.value}`));
+  const newValues = values.filter(e => !existingSet.has(`${e.value}`));
+  if (newValues.length > 0) {
+    await Value.insertMany(newValues);
+  } else {
+    logger.info("no values to insert")
+  }*/
+}
+
+
 if (config.writeLogsOnFile)
   setInterval(logSizeChecker, 3600000)
 
@@ -180,6 +306,14 @@ module.exports = {
   getValues() {
 
   },
+
+  /*
+  async entriesToDB(entries){
+    let found = Entries.find()
+    await Entries.insertMany(entries)
+    await Key.insertMany(entries.map(e => ({key : e.key})))
+    await Value.insertMany(entries.map(e => ({value : typeof e.value == "object" ? JSON.stringify(e.value) : e.value})))
+  },*/
 
   async insertInDBs(newObject, record, align) {
     log("Insert in DBs ", record?.s3?.object?.key || record.name)
@@ -370,12 +504,11 @@ module.exports = {
         log("entries ", entries != undefined)
         //const { keys, values } = entries
         //let values = getValues(obj, type)
-        logger.debug("entries\n",JSON.stringify(entries).substring(0,30))
+        logger.debug("entries\n", JSON.stringify(entries).substring(0, 30))
         //await sleep(100)
-        await Entries.insertMany(entries)
-        await Key.insertMany(entries.map(e => ({key : e.key})))
-        ////await sleep(100)
-        await Value.insertMany(entries.map(e => ({value : typeof e.value == "object" ? JSON.stringify(e.value) : e.value})))
+        await insertUniqueEntries(entries.map(e => ({ key: e.key, value: typeof e.value == "object" ? JSON.stringify(e.value) : e.value })))
+        await insertUniqueKeys(entries.map(e => ({ key: e.key })))
+        await insertUniqueValues(entries.map(e => ({ value: typeof e.value == "object" ? JSON.stringify(e.value) : e.value })))
       }
       catch (error) {
         if (!error?.errorResponse?.message?.includes("Document can't have"))
@@ -383,7 +516,11 @@ module.exports = {
         //log("Probably there are some special characters not allowed")
         try {
           //const { keys, values } = entries
-          await Entries.insertMany(JSON.parse(JSON.stringify(entries).replace(/\$/g, '')))
+          let cleanedEntries = JSON.parse(JSON.stringify(entries).replace(/\$/g, ''))
+          await insertUniqueEntries(cleanedEntries.map(e => ({ key: e.key, value: typeof e.value == "object" ? JSON.stringify(e.value) : e.value })))
+          await insertUniqueKeys(cleanedEntries.map(e => ({ key: e.key })))
+          await insertUniqueValues(cleanedEntries.map(e => ({ value: typeof e.value == "object" ? JSON.stringify(e.value) : e.value })))
+          //await Entries.insertMany(JSON.parse(JSON.stringify(entries).replace(/\$/g, '')))
           //await Value.insertMany(JSON.parse(JSON.stringify(values).replace(/\$/g, '')))
           //log("Indeed")
         }
