@@ -84,18 +84,18 @@ module.exports = {
       if (obj[0].features)
         obj = [{ json: obj[0].features }]
       else{
-        logger.debug(obj[0])
+        logger.trace(obj[0])
         return Object.entries(obj[0]).map(arr => ({key : arr[0], value : arr[1]}))
       }
       /*return {
         keys: Object.keys(obj[0]).map(k => ({ key: k })),
         values: Object.values(obj[0]).map(v => ({ value: v }))
       }*/
-      logger.debug("so it was a geojson")
+      logger.trace("so it was a geojson")
       //await sleep(100)
     }
-    logger.debug("Here's obj before flatmap")
-    logger.debug(JSON.stringify(obj).substring(0, 30))
+    logger.trace("Here's obj before flatmap")
+    logger.trace(JSON.stringify(obj).substring(0, 30))
     //await sleep(100)
     obj = obj[0].json || obj[0].csv
     if (obj[0].properties)
@@ -110,10 +110,9 @@ module.exports = {
     );*/
 
 
-    logger.debug("Here's obj after flatmap or custom cose")
-    logger.debug(JSON.stringify(obj).substring(0, 30))
+    logger.trace("Here's obj after flatmap or custom cose")
+    logger.trace(JSON.stringify(obj).substring(0, 30))
     //await sleep(100)
-    logger.debug()
     return entries.map(arr => ({key : arr[0], value : arr[1]}))
     /*return {
       keys: [...new Set(obj[0].json.flatMap(o => Object.keys(o)))].map(k => ({ key: k })),

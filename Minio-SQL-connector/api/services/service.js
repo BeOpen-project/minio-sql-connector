@@ -1,3 +1,7 @@
+const Log = require('../../utils/logger')//.app(module);
+const { Logger } = Log
+const logger = new Logger("service")
+const log = logger.info
 const Source = require('../models/source')
 const Value = require('../models/value')
 const Key = require('../models/key')
@@ -63,7 +67,87 @@ async function sync() {
             }
             console.debug("Bucket ", bucketIndex++, " of ", buckets.length, " scanning done")
         }
-        await save(objects)
+
+        minioWriter.entities.values = []
+        minioWriter.entities.keys = []
+        minioWriter.entities.entries = []
+        minioWriter.entities.uniqueValues = []
+        minioWriter.entities.uniqueKeys = []
+        minioWriter.entities.uniqueEntries = []
+
+        for (let obj of objects)
+            await minioWriter.insertInDBs(obj.raw, obj.info, true)
+
+        const existingValues = (await Value.find({}, { value: 1, _id: 0 })).map(v => v.value);
+        const existingKeys = (await Key.find({}, { key: 1, _id: 0 })).map(k => k.key);
+        const existingEntries = await Entries.find({ key: { $in: minioWriter.entities.entries.map(e => e.key) } }, { key: 1, value: 1, _id: 0 });
+
+        const existingValuesSet = new Set(existingValues);
+        const uniqueValues = existingValues[0] ? minioWriter.entities.values.filter(value => !existingValuesSet.has(value.value)) : minioWriter.entities.values;
+        try {
+            if (uniqueValues.length > 0) await Value.insertMany(uniqueValues);
+        }
+        catch (error) {
+            if (!error?.errorResponse?.message?.includes("Document can't have"))
+                log(error)
+            else
+                try {
+                    await Value.insertMany(uniqueValues.map(v => ({ value: v.value.replace(/\$/g, '') })))
+                }
+                catch (error) {
+                    log("There are problems inserting object in mongo DB")
+                    log(error)
+                }
+        }
+
+        const existingKeysSet = new Set(existingKeys);
+        const uniqueKeys = existingKeys[0] ? minioWriter.entities.keys.filter(key => !existingKeysSet.has(key.key)) : minioWriter.entities.keys;
+        try {
+            if (uniqueKeys.length > 0) await Key.insertMany(uniqueKeys);
+            /*else {
+                console.error(uniqueKeys, minioWriter.entities.keys)
+                process.exit(1)
+            }*/
+        }
+        catch (error) {
+            if (!error?.errorResponse?.message?.includes("Document can't have"))
+                log(error)
+            else
+                try {
+                    await Key.insertMany(uniqueKeys.map(k => ({ key: k.key.replace(/\$/g, '') })))
+                }
+                catch (error) {
+                    log("There are problems inserting object in mongo DB")
+                    log(error)
+                }
+        }
+
+        const existingMap = new Map();
+        existingEntries.forEach(e => {
+            if (!existingMap.has(e.key)) {
+                existingMap.set(e.key, new Set());
+            }
+            existingMap.get(e.key).add(e.value);
+        });
+        const uniqueEntries = existingEntries[0] ? minioWriter.entities.entries.filter(entry => !existingMap.has(entry.key) || !existingMap.get(entry.key).has(entry.value)) : minioWriter.entities.entries;
+        try {
+            if (uniqueEntries.length > 0) await Entries.insertMany(uniqueEntries);
+            /*else {
+                console.error(uniqueEntries, minioWriter.entities)
+            }*/
+        }
+        catch (error) {
+            if (!error?.errorResponse?.message?.includes("Document can't have"))
+                log(error)
+            else
+                try {
+                    await Entries.insertMany(uniqueEntries.map(e => ({ key: e.key.replace(/\$/g, ''), value: e.value.replace(/\$/g, '') })))
+                }
+                catch (error) {
+                    log("There are problems inserting object in mongo DB")
+                    log(error)
+                }
+        }
         syncing = false
         console.log("Syncing finished")
         return "Sync finished"
@@ -74,7 +158,7 @@ async function sync() {
     }
 }
 
-if(!config.doNotSyncAtStart)
+if (!config.doNotSyncAtStart)
     sync()
 if (config.syncInterval)
     setInterval(sync, config.syncInterval);
@@ -96,15 +180,15 @@ function objectFilter(obj, prefix, bucket, visibility) {
 
 module.exports = {
 
-    async getKeys(){
+    async getKeys() {
         return await Key.find()
     },
 
-    async getValues(){
+    async getValues() {
         return await Value.find()
     },
 
-    async getEntries(){
+    async getEntries() {
         return await Entries.find()
     },
 
