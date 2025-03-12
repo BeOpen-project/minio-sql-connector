@@ -28,13 +28,13 @@ function logSizeChecker() {
   let stats = fs.statSync(logFile)
   let fileSizeInBytes = stats.size;
   let fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
-  console.log("Log size is ", fileSizeInMegabytes)
+  logger.log("Log size is ", fileSizeInMegabytes)
   if (fileSizeInMegabytes > 50)
     fs.writeFile(logFile, "", err => {
       if (err) {
-        console.error(err);
+        logger.error(err);
       } else {
-        console.log("Log reset")
+        logger.log("Log reset")
       }
     });
 }
@@ -149,7 +149,7 @@ async function insertInDBs(newObject, record, align) {
   if (typeof data != "string")
     data = JSON.stringify(data)
   //let comp1 = JSON.stringify(record)
-  //console.debug(data.substring(0,10),"...\n", comp1.substring(0,10), "...")
+  //logger.debug(data.substring(0,10),"...\n", comp1.substring(0,10), "...")
   //log("Query name", queryName)
   //queryName.replace(/ /g, '');
 
@@ -352,7 +352,7 @@ async function insertInDBs(newObject, record, align) {
 }
 
 function log2(...m) {
-  console.log(...m)
+  logger.log(...m)
   if (config.writeLogsOnFile) {
     let args = [...m]
     for (let arg of args)
@@ -587,7 +587,7 @@ module.exports = {
     if (typeof data != "string")
       data = JSON.stringify(data)
     //let comp1 = JSON.stringify(record)
-    //console.debug(data.substring(0,10),"...\n", comp1.substring(0,10), "...")
+    //logger.debug(data.substring(0,10),"...\n", comp1.substring(0,10), "...")
     //log("Query name", queryName)
     //queryName.replace(/ /g, '');
 
@@ -739,41 +739,45 @@ module.exports = {
     //await sleep(100)
     if (type != "raw")
       try {
-        entries = await getEntries(insertingSource, type)
+        entries = await getEntries(insertingSource, type, record?.s3?.object?.key || record.name)
         log("entries ", entries != undefined)
         //const { keys, values } = entries
         //let values = getValues(obj, type)
         logger.trace("entries\n", JSON.stringify(entries).substring(0, 30))
         //await sleep(100)
 
-        let newEntries = entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value }))
-        let newValues = entries.map(e => ({value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value }))
-        let newKeys = entries.map(e => ({ key: e.key }))
+        let newEntries = entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value, name: e.name }))
+        let newValues = entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value, name: e.name }))
+        let newKeys = entries.map(e => ({ key: e.key, name: e.name }))
         // 1. Prima coppia (entries) - Contiene sia key che value
         const existingEntries = new Map();
         this.entities.entries.forEach(entry => {
-          existingEntries.set(`${entry.key}-${entry.value}`, true);  // Usa key-value combinato come chiave
+          existingEntries.set(`${entry.key}-${entry.value}-${entry.name}`, true);  // Usa key-value combinato come chiave
         });
 
         // Filtra gli oggetti da newEntries che non sono già presenti in this.entities.entries
         const uniqueEntries = newEntries.filter(entry =>
-          !existingEntries.has(`${entry.key}-${entry.value}`)
+          !existingEntries.has(`${entry.key}-${entry.value}-${entry.name}`)
         );
 
         // 2. Seconda coppia (values) - Contiene solo value
-        const existingValues = new Set(this.entities.values.map(item => item.value));  // Set per un rapido lookup
-
+        const existingValues = new Map();//new Set(this.entities.values.map(item => item.value));  // Set per un rapido lookup
+        this.entities.values.forEach(value => {
+          existingValues.set(`${value.value}-${value.name}`, true);  // Usa key-value combinato come chiave
+        });
         // Filtra gli oggetti da newValues che non sono già presenti in this.entities.values
-        const uniqueValues = newValues.filter(valueItem =>
-          !existingValues.has(valueItem.value)
+        const uniqueValues = newValues.filter(value =>
+          !existingValues.has(`${value.value}-${value.name}`)
         );
 
         // 3. Terza coppia (keys) - Contiene solo key
-        const existingKeys = new Set(this.entities.keys.map(item => item.key));  // Set per un rapido lookup
-
+        const existingKeys = new Map();//new Set(this.entities.keys.map(item => item.key));  // Set per un rapido lookup
+        this.entities.keys.forEach(key => {
+          existingKeys.set(`${key.key}-${key.name}`, true);  // Usa key-value combinato come chiave
+        });
         // Filtra gli oggetti da newKeys che non sono già presenti in this.entities.keys
-        const uniqueKeys = newKeys.filter(keyItem =>
-          !existingKeys.has(keyItem.key)
+        const uniqueKeys = newKeys.filter(key =>
+          !existingKeys.has(`${key.key}-${key.name}`)
         );
 
         // 4. Unisci gli array unici
@@ -781,13 +785,14 @@ module.exports = {
         //const mergedValues = [...this.entities.values, ...uniqueValues];
         //const mergedKeys = [...this.entities.keys, ...uniqueKeys];
 
-        //console.log("Merged Entries:", mergedEntries);
-        //console.log("Merged Values:", mergedValues);
-        //console.log("Merged Keys:", mergedKeys);
+        //logger.log("Merged Entries:", mergedEntries);
+        //logger.log("Merged Values:", mergedValues);
+        //logger.log("Merged Keys:", mergedKeys);
 
         this.entities.values = this.entities.values.concat(uniqueValues)
         this.entities.keys = this.entities.keys.concat(uniqueKeys)
         this.entities.entries = this.entities.entries.concat(uniqueEntries)
+        //logger.debug("CONTROLLO SE C' E' NAME", this.entities.values[0])
 
         /*this.entities.values = this.entities.values.concat(entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
         this.entities.keys = this.entities.keys.concat(entries.map(e => ({ key: e.key })))
@@ -854,7 +859,7 @@ module.exports = {
       }
       catch (error) {
         log("Error during getting object")
-        console.error(error)
+        logger.error(error)
         return
       }
       if (newObject)

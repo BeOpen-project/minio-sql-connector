@@ -12,7 +12,7 @@ function objectCheck(objs) {
         obj[key] = valueParsed
       }
       catch (error) {
-        console.error(error)
+        logger.error(error)
       }
 
 }
@@ -22,31 +22,31 @@ async function sleep(ms) {
 }
 
 function convertCSVtoJSON(csvData) {
-  console.debug(csvData)
+  logger.debug(csvData)
   const lines = csvData.split('\r\n');
-  //console.debug(this.minify(lines))
+  //logger.debug(this.minify(lines))
   const possibleHeaders = [
     lines[0].trim().split(','),
     lines[0].trim().split(';')
   ]
-  //console.debug(this.minify(possibleHeaders))
+  //logger.debug(this.minify(possibleHeaders))
   const headers = possibleHeaders[0].length > possibleHeaders[1].length ? possibleHeaders[0] : possibleHeaders[1]
   const results = [];
-  //console.debug(this.minify(headers))
+  //logger.debug(this.minify(headers))
 
   //for (let i = 1; i < lines.length - 1 || i < 2 ; i++) {
   for (let i = 1; i < lines.length; i++) {
     const obj = {};
     const currentLine = lines[i].trim().split(possibleHeaders[0].length > possibleHeaders[1].length ? "," : ";");
-    //console.debug(this.minify(currentLine))
+    //logger.debug(this.minify(currentLine))
     for (let j = 0; j < headers.length; j++)
       obj[this.deleteSpaces(headers[j].replaceAll(/['"]/g, ''))] = this.deleteSpaces(currentLine[j]?.replaceAll(/['"]/g, ''));
     results.push(obj);
-    //console.debug(this.minify(obj))
+    //logger.debug(this.minify(obj))
   }
   //return results
-  //console.debug("convert csv to json")
-  //console.debug(this.minify(results))
+  //logger.debug("convert csv to json")
+  //logger.debug(this.minify(results))
   return JSON.stringify(results);
 }
 
@@ -65,12 +65,12 @@ module.exports = {
       return obj
     }
     catch (error) {
-      console.error(error.toString())
+      logger.error(error.toString())
       return obj
     }
   },
 
-  async getEntries(obj, type) {// csv, jsonArray, json
+  async getEntries(obj, type, name) {// csv, jsonArray, json
     let csvParsed, logCounterFlag
     let delays = 10
     if (!obj[0].csv && Array.isArray(obj[0].json) && type != "jsonArray")
@@ -83,9 +83,9 @@ module.exports = {
     if (type == "json") {
       if (obj[0].features)
         obj = [{ json: obj[0].features }]
-      else{
+      else {
         logger.trace(obj[0])
-        return Object.entries(obj[0]).map(arr => ({key : arr[0], value : arr[1]}))
+        return Object.entries(obj[0]).map(arr => ({ key: arr[0], value: arr[1], name: name }))
       }
       /*return {
         keys: Object.keys(obj[0]).map(k => ({ key: k })),
@@ -113,7 +113,7 @@ module.exports = {
     logger.trace("Here's obj after flatmap or custom cose")
     logger.trace(JSON.stringify(obj).substring(0, 30))
     //await sleep(100)
-    return entries.map(arr => ({key : arr[0], value : arr[1]}))
+    return entries.map(arr => ({ key: arr[0], value: arr[1], name: name }))
     /*return {
       keys: [...new Set(obj[0].json.flatMap(o => Object.keys(o)))].map(k => ({ key: k })),
       values: [...new Set(obj[0].json.flatMap(o => Object.keys(o)))].map(v => ({ value: v }))
@@ -122,7 +122,7 @@ module.exports = {
 
   async setType(extension, jsonParsed) {
     //extension == "csv", Array.isArray(jsonParsed), typeof jsonParsed == "object"
-    console.debug("csv ", extension == "csv", " array ", Array.isArray(jsonParsed), " object ", typeof jsonParsed == "object", " jsonparsed ", jsonParsed)
+    logger.debug("csv ", extension == "csv", " array ", Array.isArray(jsonParsed), " object ", typeof jsonParsed == "object", " jsonparsed ", jsonParsed)
     //await sleep(100)
     return extension == "csv" ?
       "csv" :
@@ -135,7 +135,7 @@ module.exports = {
 
   json2csv(obj) {
     return JSON.stringify([obj])
-    console.debug("json2csv")
+    logger.debug("json2csv")
     let csv = ""
 
     for (let key in obj)
@@ -179,36 +179,36 @@ module.exports = {
   },
 
   convertCSVtoJSON(csvData) {
-    //console.debug(this.minify(csvData))
+    //logger.debug(this.minify(csvData))
     const lines = csvData.split('\r\n');
-    //console.debug(this.minify(lines))
+    //logger.debug(this.minify(lines))
     const possibleHeaders = [
       lines[0].trim().split(','),
       lines[0].trim().split(';')
     ]
-    //console.debug(this.minify(possibleHeaders))
+    //logger.debug(this.minify(possibleHeaders))
     const headers = possibleHeaders[0].length > possibleHeaders[1].length ? possibleHeaders[0] : possibleHeaders[1]
     const results = [];
-    //console.debug(this.minify(headers))
+    //logger.debug(this.minify(headers))
 
     //for (let i = 1; i < lines.length - 1 || i < 2 ; i++) {
     for (let i = 1; i < lines.length; i++) {
       const obj = {};
       const currentLine = lines[i].trim().split(possibleHeaders[0].length > possibleHeaders[1].length ? "," : ";");
-      //console.debug(this.minify(currentLine))
+      //logger.debug(this.minify(currentLine))
       for (let j = 0; j < headers.length; j++)
         obj[this.deleteSpaces(headers[j].replaceAll(/['"]/g, ''))] = this.deleteSpaces(currentLine[j]?.replaceAll(/['"]/g, ''));
       results.push(obj);
-      //console.debug(this.minify(obj))
+      //logger.debug(this.minify(obj))
     }
     //return results
-    //console.debug("convert csv to json")
-    //console.debug(this.minify(results))
+    //logger.debug("convert csv to json")
+    //logger.debug(this.minify(results))
     return JSON.stringify(results);
   },
 
   cleaned(obj) {
-    //console.log(typeof obj != "string" ? JSON.stringify(obj) : obj)
+    //logger.log(typeof obj != "string" ? JSON.stringify(obj) : obj)
     //return obj
     //return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"\r\n\s]/g, ''); /['"\r\n]/g /['"]/g
     //return JSON.stringify(JSON.parse((typeof obj != "string" ? JSON.stringify(obj) : obj).replace( /['\r\n]/g, '')));

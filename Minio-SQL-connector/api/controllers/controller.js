@@ -1,12 +1,15 @@
 const service = require("../services/service.js")
 const common = require("../../utils/common.js")
+const Log = require('../../utils/logger.js')//.app(module);
+const { Logger } = Log
+const logger = new Logger("controller")
 
 
 const queryMongo = async (req, res) => {
     if (req.headers.israwquery)
-        return await res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)) && console.log("Raw query finished")
-    console.log("Query mongo")
-    console.debug("format ", req.query.format)
+        return await res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)) && logger.log("Raw query finished")
+    logger.log("Query mongo")
+    logger.debug("format ", req.query.format)
     if (req.query.format == "JSON") {
         let objectQuerySet = JSON.parse(JSON.stringify(req.body.mongoQuery || req.query))
         objectQuerySet.format = "Object"
@@ -25,15 +28,15 @@ const queryMongo = async (req, res) => {
     }
     else
         res.send(await service.mongoQuery({ ...req.body.mongoQuery, ...req.query }, req.body.prefix, req.body.bucketName, req.headers.visibility))
-    console.log("Query mongo finished")
+    logger.log("Query mongo finished")
 
 }
 
 const querySQL = async (req, res) => {
-    console.log("Query sql")
+    logger.log("Query sql")
     if (!req.body.query)
         return await res.status(400).send("Missing query")
-    console.log("Query : ", req.body.query)
+    logger.log("Query : ", req.body.query)
     service.querySQL(res, req.body.query, req.body.prefix, req.body.bucketName, req.headers.visibility)
 }
 
@@ -42,47 +45,47 @@ module.exports = {
     queryMongo, querySQL,
 
     query: async (req, res) => {
-        console.log("Query: \n", req.query, "\n","Body : \n", req.body)
+        logger.log("Query: \n", req.query, "\n","Body : \n", req.body)
         if (req.body.mongoQuery)
             return await queryMongo(req, res)
         querySQL(req, res)
     },
 
     getValues: async (req, res) => {
-        console.log("values")
+        logger.log("values")
         try {
             res.send(await service.getValues())
         }
         catch (error) {
-            console.error(error)
+            logger.error(error)
             res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
         }
     },
 
     getEntries: async (req, res) => {
-        console.log("values")
+        logger.log("values")
         try {
             res.send(await service.getEntries())
         }
         catch (error) {
-            console.error(error)
+            logger.error(error)
             res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
         }
     },
 
     getKeys: async (req, res) => {
-        console.log("keys")
+        logger.log("keys")
         try {
             res.send(await service.getKeys())
         }
         catch (error) {
-            console.error(error)
+            logger.error(error)
             res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
         }
     },
 
     sync: async (req, res) => {
-        console.log("Sync")
+        logger.log("Sync")
         return await res.send(await service.sync())
     },
 
@@ -91,7 +94,7 @@ module.exports = {
             res.send(await service.minioListObjects(req.params.bucketName || req.query.bucketName))
         }
         catch (error) {
-            console.error(error)
+            logger.error(error)
             res.status(500).send(error.toString() == "[object Object]" ? error : error.toString())
         }
     },

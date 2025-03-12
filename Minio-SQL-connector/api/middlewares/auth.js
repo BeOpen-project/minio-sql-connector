@@ -7,6 +7,9 @@ const realm = authConfig.authRealm;
 const clientID = authConfig.clientId;
 const clientSecret = authConfig.secret;
 const {parseJwt} = require("../../utils/common")
+const Log = require('../../utils/logger')//.app(module);
+const { Logger } = Log
+const logger = new Logger("auth")
 
 module.exports = {
     auth: async (req, res, next) => {
@@ -45,7 +48,7 @@ module.exports = {
                 }
                 catch (error) {
 
-                    console.error(error)
+                    logger.error(error)
                     if (error.message == "invalid token" || error.message == "jwt expired" || error.message == "jwt malformed")
                         return res.sendStatus(403);
                     else
@@ -64,16 +67,16 @@ module.exports = {
                     axios.post(introspectionEndpoint, data)
                         .then(response => {
                             if (response.data.active) {
-                                console.info('Token valid:', response.data);
+                                logger.info('Token valid:', response.data);
                                 next();
                             } else {
-                                console.error('Token not valid.');
+                                logger.error('Token not valid.');
                                 return res.sendStatus(403);
                             }
                         })
                         .catch(error => {
-                            console.error(error.response.data)
-                            console.error('Errore during token verify:', error.message);
+                            logger.error(error.response.data)
+                            logger.error('Errore during token verify:', error.message);
                             return res.sendStatus(500);
                         });
                 }
@@ -89,17 +92,17 @@ module.exports = {
                             req.body.bucketName = pilot.toLowerCase() //+ "/" + email + "/" + config.minioConfig.defaultInputFolderName//{pilot, email}
                             req.body.prefix = (email || username) + "/" + config.minioConfig.defaultInputFolderName
                             config.group = email || username
-                            console.debug(req.body.prefix)
+                            logger.debug(req.body.prefix)
                         }
                         catch (error) {
-                            console.error(error?.toString())
-                            console.error(error?.response?.data || error?.response)
+                            logger.error(error?.toString())
+                            logger.error(error?.response?.data || error?.response)
                             req.body.prefix = decodedToken.email
                             config.group = decodedToken.email
                         }
 
                         //if (req.params.bucketName && req.params.objectName)
-                        //    console.debug(req.body.bucketName , req.params.bucketName , req.body.prefix , req.params.objectName.split("/")[0] + "/" + req.params.objectName.split("/")[1])
+                        //    logger.debug(req.body.bucketName , req.params.bucketName , req.body.prefix , req.params.objectName.split("/")[0] + "/" + req.params.objectName.split("/")[1])
                         let deniedQuery, query
                         try {
                             if (req.body.query) {
@@ -117,7 +120,7 @@ module.exports = {
                             //    res.status(403).send("Available bucketname is " + req.body.bucketName + " and you tried to access " + req.body.query.split("FROM ")[1].split(" ") + ".\nAvailable prefix is " + req.body.prefix + " and you tried to access this object " + req.body.query.split("name = '")[1].split("'"));
                         }
                         catch (error) {
-                            console.error(error)
+                            logger.error(error)
                             next()
                         }
                     }

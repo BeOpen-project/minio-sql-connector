@@ -21,7 +21,7 @@ if (minioConfig.subscribe.all)
         let a = 1
         for (let bucket of buckets) {
             minioWriter.getNotifications(bucket.name.toString())
-            console.debug("Subscribed bucket " + (a++) + " of " + buckets.length, "(", bucket.name, ")")
+            logger.debug("Subscribed bucket " + (a++) + " of " + buckets.length, "(", bucket.name, ")")
         }
     })
 else
@@ -51,21 +51,21 @@ async function sync() {
             for (let obj of bucketObjects) {
                 try {
                     await sleep(delays)
-                    console.debug("Bucket ", bucketIndex, " of ", buckets.length)
-                    console.debug("Scanning object ", index++, " of ", bucketObjects.length, ",", obj.name)
+                    logger.debug("Bucket ", bucketIndex, " of ", buckets.length)
+                    logger.debug("Scanning object ", index++, " of ", bucketObjects.length, ",", obj.name)
                     let extension = obj.name.split(".").pop()
                     let isAllowed = (queryAllowedExtensions == "all" || queryAllowedExtensions.includes(extension))
                     if (obj.size && obj.isLatest && isAllowed) {//} && !obj.isDeleteMarker) {
                         let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                         objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                     }
-                    else console.log("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+                    else logger.log("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
                 }
                 catch (error) {
-                    console.error(error)
+                    logger.error(error)
                 }
             }
-            console.debug("Bucket ", bucketIndex++, " of ", buckets.length, " scanning done")
+            logger.debug("Bucket ", bucketIndex++, " of ", buckets.length, " scanning done")
         }
 
         minioWriter.entities.values = []
@@ -78,12 +78,27 @@ async function sync() {
         for (let obj of objects)
             await minioWriter.insertInDBs(obj.raw, obj.info, true)
 
-        const existingValues = (await Value.find({}, { value: 1, _id: 0 })).map(v => v.value);
-        const existingKeys = (await Key.find({}, { key: 1, _id: 0 })).map(k => k.key);
-        const existingEntries = await Entries.find({ key: { $in: minioWriter.entities.entries.map(e => e.key) } }, { key: 1, value: 1, _id: 0 });
+        //minioWriter.entities.values = minioWriter.entities.values.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
+        //minioWriter.entities.keys = minioWriter.entities.keys.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
+        //minioWriter.entities.entries = minioWriter.entities.entries.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
 
-        const existingValuesSet = new Set(existingValues);
-        const uniqueValues = existingValues[0] ? minioWriter.entities.values.filter(value => !existingValuesSet.has(value.value)) : minioWriter.entities.values;
+        const existingValues = (await Value.find({ value: { $in: minioWriter.entities.values.map(v => v.value) } }))//.map(v => v.value);
+        const existingKeys = (await Key.find({ key: { $in: minioWriter.entities.keys.map(k => k.key) } }))//.map(k => k.key); //{ key: 1, _id: 0 }
+        const existingEntries = await Entries.find({ key: { $in: minioWriter.entities.entries.map(e => e.key) } });
+
+        // inizio mod
+        const existingValuesMap = new Map();
+        existingValues.forEach(v => {
+            if (!existingValuesMap.has(v.name)) {
+                existingValuesMap.set(v.name, new Set());
+            }
+            existingValuesMap.get(v.name).add(v.value);
+        });
+        const uniqueValues = existingValues[0] ? minioWriter.entities.values.filter(entry => !existingValuesMap.has(entry.name) || !existingValuesMap.get(entry.name).has(entry.value)) : minioWriter.entities.values;
+        // fine mod
+
+        //const existingValuesSet = new Set(existingValues);
+        //const uniqueValues = existingValues[0] ? minioWriter.entities.values.filter(value => !existingValuesSet.has(value.value)) : minioWriter.entities.values;
         try {
             if (uniqueValues.length > 0) await Value.insertMany(uniqueValues);
         }
@@ -100,12 +115,22 @@ async function sync() {
                 }
         }
 
-        const existingKeysSet = new Set(existingKeys);
-        const uniqueKeys = existingKeys[0] ? minioWriter.entities.keys.filter(key => !existingKeysSet.has(key.key)) : minioWriter.entities.keys;
+        // inizio mod
+        const existingKeysMap = new Map();
+        existingKeys.forEach(k => {
+            if (!existingKeysMap.has(k.name)) {
+                existingKeysMap.set(k.name, new Set());
+            }
+            existingKeysMap.get(k.name).add(k.key);
+        });
+        const uniqueKeys = existingKeys[0] ? minioWriter.entities.keys.filter(entry => !existingKeysMap.has(entry.name) || !existingKeysMap.get(entry.name).has(entry.key)) : minioWriter.entities.keys;
+        // fine mod
+        //const existingKeysSet = new Set(existingKeys);
+        //const uniqueKeys = existingKeys[0] ? minioWriter.entities.keys.filter(key => !existingKeysSet.has(key.key)) : minioWriter.entities.keys;
         try {
             if (uniqueKeys.length > 0) await Key.insertMany(uniqueKeys);
             /*else {
-                console.error(uniqueKeys, minioWriter.entities.keys)
+                logger.error(uniqueKeys, minioWriter.entities.keys)
                 process.exit(1)
             }*/
         }
@@ -122,18 +147,43 @@ async function sync() {
                 }
         }
 
-        const existingMap = new Map();
+        /*
+        const existingEntriesMap = new Map();
         existingEntries.forEach(e => {
-            if (!existingMap.has(e.key)) {
-                existingMap.set(e.key, new Set());
+            if (!existingEntriesMap.has(e.key)) {
+                existingEntriesMap.set(e.key, new Set());
             }
-            existingMap.get(e.key).add(e.value);
+            existingEntriesMap.get(e.key).add(e.value);
+            existingEntriesMap.get(e.key).add(e.name);
         });
-        const uniqueEntries = existingEntries[0] ? minioWriter.entities.entries.filter(entry => !existingMap.has(entry.key) || !existingMap.get(entry.key).has(entry.value)) : minioWriter.entities.entries;
+        const uniqueEntries = existingEntries[0] ? minioWriter.entities.entries.filter(entry => !existingEntriesMap.has(entry.key) || (!existingEntriesMap.get(entry.key).has(entry.value)) && !existingEntriesMap.get(entry.key).has(entry.name)) : minioWriter.entities.entries;*/
+
+        //mod2
+        // Creiamo una mappa che tiene traccia dei valori di 'value' e 'name' separatamente per ogni 'key'
+        const existingEntriesMap = new Map();
+        existingEntries.forEach(e => {
+            if (!existingEntriesMap.has(e.key)) {
+                existingEntriesMap.set(e.key, { values: new Set(), names: new Set() });
+            }
+            existingEntriesMap.get(e.key).values.add(e.value);
+            existingEntriesMap.get(e.key).names.add(e.name);
+        });
+
+        // Filtra le voci uniche
+        const uniqueEntries = existingEntries[0]
+            ? minioWriter.entities.entries.filter(entry => {
+                const entryMap = existingEntriesMap.get(entry.key);
+                return (
+                    !entryMap ||  // Se non esiste una voce con quella 'key', è unica
+                    (!entryMap.values.has(entry.value) && !entryMap.names.has(entry.name)) // Se il valore o il nome non esistono, è unica
+                );
+            })
+            : minioWriter.entities.entries;
+        //finemod2
         try {
             if (uniqueEntries.length > 0) await Entries.insertMany(uniqueEntries);
             /*else {
-                console.error(uniqueEntries, minioWriter.entities)
+                logger.error(uniqueEntries, minioWriter.entities)
             }*/
         }
         catch (error) {
@@ -149,11 +199,11 @@ async function sync() {
                 }
         }
         syncing = false
-        console.log("Syncing finished")
+        logger.log("Syncing finished")
         return "Sync finished"
     }
     else {
-        console.log("Syncing not finished")
+        logger.log("Syncing not finished")
         return "Syncing"
     }
 }
@@ -225,7 +275,7 @@ module.exports = {
 
     async exampleQueryGeoJson(query) {
 
-        console.debug("example query geojson: query ", query)
+        logger.debug("example query geojson: query ", query)
 
         //let key
         //for (let k in query)
@@ -331,9 +381,9 @@ module.exports = {
                     }
                 }
             })
-        //console.debug("Found : ", found.length, " items")
-        //console.debug(found)
-        //console.debug({ ...propertiesQuery })
+        //logger.debug("Found : ", found.length, " items")
+        //logger.debug(found)
+        //logger.debug({ ...propertiesQuery })
         return found
     },
 
@@ -344,16 +394,16 @@ module.exports = {
             obj.path = obj.name
             obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
         }
-        console.log(result)
+        logger.log(result)
         return result
     },
 
     async mongoQuery(query, prefix, bucket, visibility) {
-        console.debug("format ", query.format)
+        logger.debug("format ", query.format)
         let format = query.format?.toLowerCase()
         if (format)
             delete query["format"]
-        console.debug("format ", format)
+        logger.debug("format ", format)
         //query.name = new RegExp("^" + prefix, 'i')
         switch (format) {
             case "geojson": return (await this.exampleQueryGeoJson(query)).filter(obj => objectFilter(obj, prefix, bucket, visibility))//obj.name.includes(prefix))
@@ -365,7 +415,7 @@ module.exports = {
     },
 
     async rawQuery(query, prefix, bucket, visibility) {
-        console.log("Raw query")
+        logger.log("Raw query")
         //query.name = new RegExp("^" + prefix, 'i')
         let objects = []
         if (visibility == "public")
@@ -378,7 +428,7 @@ module.exports = {
                 }
             }
             catch (error) {
-                console.error(error)
+                logger.error(error)
             }
         }
         return objects.filter(obj => typeof obj.raw == "string" ? objectFilter(obj, prefix, bucket, visibility) && (!query.value || obj.raw.includes(query.value)) : objectFilter(obj, prefix, bucket, visibility) && (!query.value || JSON.stringify(obj.raw).includes(query.value)))
@@ -389,16 +439,16 @@ module.exports = {
     querySQL(response, query, prefix, bucket, visibility) {
         client.query(query, (err, res) => {
             if (err) {
-                console.error("ERROR");
-                console.error(err);
+                logger.error("ERROR");
+                logger.error(err);
                 response.status(500).json(err.toString())
-                console.log("Query sql finished with errors")
+                logger.log("Query sql finished with errors")
                 return;
             }
             else {
                 response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)).map(obj => obj.element && obj.name.split(".").pop() == "csv" ? { ...obj, element: json2csv(obj.element) } : obj))
-                console.log(res.rows);
-                console.log("Query sql finished")
+                logger.log(res.rows);
+                logger.log("Query sql finished")
             }
         });
     }
