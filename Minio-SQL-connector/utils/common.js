@@ -21,6 +21,12 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function stringify(item) {
+  if (typeof item != "string")
+    return JSON.stringify(item)
+  return item
+}
+
 function convertCSVtoJSON(csvData) {
   logger.debug(csvData)
   const lines = csvData.split('\r\n');
@@ -50,6 +56,24 @@ function convertCSVtoJSON(csvData) {
   return JSON.stringify(results);
 }
 
+function getVisibility(name) {
+
+  name = name.split("/")
+  if (name[0].includes("@") || (name[0].toLowerCase().includes("shared data")))
+    return name[0]
+  return "public-data"
+}
+
+function syncEntries(obj, visibility, entries) {
+  for (let key in obj)
+    if (!entries[key])
+      entries[key] = { [stringify(obj[key])]: [visibility] }
+    else if (!entries[key][stringify(obj[key])])
+      entries[key][stringify(obj[key])] = [visibility]
+    else
+      entries[key][stringify(obj[key])].push(visibility)
+}
+
 module.exports = {
 
   sleep(ms) {
@@ -70,9 +94,10 @@ module.exports = {
     }
   },
 
-  async getEntries(obj, type, name) {// csv, jsonArray, json
+  async getEntries(obj, type, name, entries) {// csv, jsonArray, json
     let csvParsed, logCounterFlag
     let delays = 10
+    let visibility = getVisibility(name)
     if (!obj[0].csv && Array.isArray(obj[0].json) && type != "jsonArray")
       type = "jsonArray" //throw new Error("obj is a jsonArray and not " + type)
     else if ((!obj[0].csv && !Array.isArray(obj[0].json) && typeof obj == "object") && type != "json")
@@ -85,7 +110,17 @@ module.exports = {
         obj = [{ json: obj[0].features }]
       else {
         logger.trace(obj[0])
-        return Object.entries(obj[0]).map(arr => ({ key: arr[0], value: arr[1], name: name }))
+        syncEntries(obj[0], visibility, entries)
+        /*
+        for (let key in obj[0])
+          if (!entries[key]) {
+            entries[key] = {}
+            entries[key][stringify(obj[0][key])] = [visibility]
+          }
+          else
+            entries[key][stringify(obj[0][key])].push(visibility)*/
+        return
+        //return Object.entries(obj[0]).map(arr => ({ key: arr[0], value: arr[1], visibility }))
       }
       /*return {
         keys: Object.keys(obj[0]).map(k => ({ key: k })),
@@ -100,9 +135,20 @@ module.exports = {
     obj = obj[0].json || obj[0].csv
     if (obj[0].properties)
       obj = obj.map(o => o.properties)
-    let entries = []
+    //let entries = []
     for (let o of obj)
-      entries.push(...Object.entries(o))
+      syncEntries(o, visibility, entries)
+    /*
+    for (let key in o)
+      if (!entries[key])
+        entries[key] = { [stringify(o[key])]: [visibility] }
+      else if (!entries[key][stringify(o[key])])
+        entries[key][stringify(o[key])] = [visibility]
+      else
+        entries[key][stringify(o[key])].push(visibility)*/
+    return
+
+    //entries.push(...Object.entries(o))
 
     /*
     obj = obj[0].json.flatMap(o => 
@@ -113,7 +159,8 @@ module.exports = {
     logger.trace("Here's obj after flatmap or custom cose")
     logger.trace(JSON.stringify(obj).substring(0, 30))
     //await sleep(100)
-    return entries.map(arr => ({ key: arr[0], value: arr[1], name: name }))
+
+    return entries.map(arr => ({ key: arr[0], value: arr[1], visibility }))
     /*return {
       keys: [...new Set(obj[0].json.flatMap(o => Object.keys(o)))].map(k => ({ key: k })),
       values: [...new Set(obj[0].json.flatMap(o => Object.keys(o)))].map(v => ({ value: v }))

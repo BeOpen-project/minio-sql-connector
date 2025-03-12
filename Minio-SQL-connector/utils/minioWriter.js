@@ -413,6 +413,10 @@ module.exports = {
     uniqueKeys: []
   },
 
+  entries: {
+
+  },
+
   client: undefined,
 
   async listObjects(bucketName) {
@@ -739,48 +743,43 @@ module.exports = {
     //await sleep(100)
     if (type != "raw")
       try {
-        entries = await getEntries(insertingSource, type, record?.s3?.object?.key || record.name)
-        log("entries ", entries != undefined)
+        //entries = 
+        await getEntries(insertingSource, type, record?.s3?.object?.key || record.name, this.entries)
+        //log("entries ", entries != undefined)
         //const { keys, values } = entries
         //let values = getValues(obj, type)
-        logger.trace("entries\n", JSON.stringify(entries).substring(0, 30))
+        //logger.trace("entries\n", JSON.stringify(entries).substring(0, 30))
         //await sleep(100)
 
+        /*
         let newEntries = entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value, name: e.name }))
         let newValues = entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value, name: e.name }))
         let newKeys = entries.map(e => ({ key: e.key, name: e.name }))
-        // 1. Prima coppia (entries) - Contiene sia key che value
         const existingEntries = new Map();
         this.entities.entries.forEach(entry => {
           existingEntries.set(`${entry.key}-${entry.value}-${entry.name}`, true);  // Usa key-value combinato come chiave
         });
 
-        // Filtra gli oggetti da newEntries che non sono già presenti in this.entities.entries
         const uniqueEntries = newEntries.filter(entry =>
           !existingEntries.has(`${entry.key}-${entry.value}-${entry.name}`)
         );
 
-        // 2. Seconda coppia (values) - Contiene solo value
         const existingValues = new Map();//new Set(this.entities.values.map(item => item.value));  // Set per un rapido lookup
         this.entities.values.forEach(value => {
           existingValues.set(`${value.value}-${value.name}`, true);  // Usa key-value combinato come chiave
         });
-        // Filtra gli oggetti da newValues che non sono già presenti in this.entities.values
         const uniqueValues = newValues.filter(value =>
           !existingValues.has(`${value.value}-${value.name}`)
         );
 
-        // 3. Terza coppia (keys) - Contiene solo key
         const existingKeys = new Map();//new Set(this.entities.keys.map(item => item.key));  // Set per un rapido lookup
         this.entities.keys.forEach(key => {
           existingKeys.set(`${key.key}-${key.name}`, true);  // Usa key-value combinato come chiave
         });
-        // Filtra gli oggetti da newKeys che non sono già presenti in this.entities.keys
         const uniqueKeys = newKeys.filter(key =>
           !existingKeys.has(`${key.key}-${key.name}`)
         );
 
-        // 4. Unisci gli array unici
         //const mergedEntries = [...this.entities.entries, ...uniqueEntries];
         //const mergedValues = [...this.entities.values, ...uniqueValues];
         //const mergedKeys = [...this.entities.keys, ...uniqueKeys];
@@ -793,6 +792,7 @@ module.exports = {
         this.entities.keys = this.entities.keys.concat(uniqueKeys)
         this.entities.entries = this.entities.entries.concat(uniqueEntries)
         //logger.debug("CONTROLLO SE C' E' NAME", this.entities.values[0])
+        */
 
         /*this.entities.values = this.entities.values.concat(entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
         this.entities.keys = this.entities.keys.concat(entries.map(e => ({ key: e.key })))
@@ -803,9 +803,9 @@ module.exports = {
         /*await insertUniqueEntries(entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
         await insertUniqueKeys(entries.map(e => ({ key: e.key })))
         await insertUniqueValues(entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))*/
-
       }
       catch (error) {
+        logger.error(error)/*
         if (!error?.errorResponse?.message?.includes("Document can't have"))
           log(error)
         //log("Probably there are some special characters not allowed")
@@ -823,7 +823,7 @@ module.exports = {
           log("There are problems inserting object in mongo DB")
           log(error)
           //await sleep(100)
-        }
+        }*/
       }
     while (!postgreFinished) {
       await sleep(delays)

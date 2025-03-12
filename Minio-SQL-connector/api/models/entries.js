@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const key = mongoose.Schema(
+const key = mongoose.Schema({}, { strict: false, versionKey: false })/*
     {
         key: { type: String, required: true },
         value: { type: mongoose.Schema.Types.Mixed, required: true },
@@ -9,6 +9,6 @@ const key = mongoose.Schema(
         //group: { type: String, required: true }
     },
     { versionKey: false }
-);
+);*/
 
 module.exports = mongoose.model("entries", key);
