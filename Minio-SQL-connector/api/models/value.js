@@ -3,8 +3,8 @@ const mongoose = require("mongoose");
 const value = mongoose.Schema(
     {
         value: { type: mongoose.Schema.Types.Mixed, required: true },
-        name: { type: String, required: true }//,
-        //visibility: { type: String, required: true },
+        //name: { type: String, required: true }//,
+        visibility: { type: Array, required: true },
         //group: { type: String, required: true }
     },
     { versionKey: false }

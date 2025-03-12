@@ -129,6 +129,19 @@ async function sync() {
                 }
             }
 
+            let valuesToDB = entries.map(obj => ({
+                visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
+                value: Object.keys(obj[Object.keys(obj).pop()]).pop()
+            }))
+            let keysToDB = entries.map(obj => ({
+                key: Object.keys(obj).pop(),
+                visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
+
+            })
+            )
+            await Key.insertMany(keysToDB)
+            await Value.insertMany(valuesToDB)
+
 
             /*
             let entries = Object.entries(minioWriter.entries)
