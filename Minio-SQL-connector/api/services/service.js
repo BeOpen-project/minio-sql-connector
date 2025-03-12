@@ -347,10 +347,10 @@ module.exports = {
 
     async getEntries(prefix, bucketName, visibility) {
         //return await Entries.find()
-        if (visibility == private) 
+        if (visibility == "private") 
             visibility = prefix.split("/")[0]
         else if (visibility == "shared")
-            visibility = bucketName.toUpperCase() + " SHARED data"
+            visibility = bucketName.toUpperCase() + " SHARED Data"
         else
             visibility = "public-data"
 
