@@ -59,7 +59,7 @@ async function sync() {
                         let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
                         objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
                     }
-                    else logger.log("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
+                    else logger.info("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
                 }
                 catch (error) {
                     logger.error(error)
@@ -199,11 +199,11 @@ async function sync() {
                 }
         }
         syncing = false
-        logger.log("Syncing finished")
+        logger.info("Syncing finished")
         return "Sync finished"
     }
     else {
-        logger.log("Syncing not finished")
+        logger.info("Syncing not finished")
         return "Syncing"
     }
 }
@@ -394,7 +394,7 @@ module.exports = {
             obj.path = obj.name
             obj.fileType = obj.name.split(".")[obj.name.split(".").length - 1]
         }
-        logger.log(result)
+        logger.info(result)
         return result
     },
 
@@ -415,7 +415,7 @@ module.exports = {
     },
 
     async rawQuery(query, prefix, bucket, visibility) {
-        logger.log("Raw query")
+        logger.info("Raw query")
         //query.name = new RegExp("^" + prefix, 'i')
         let objects = []
         if (visibility == "public")
@@ -442,13 +442,13 @@ module.exports = {
                 logger.error("ERROR");
                 logger.error(err);
                 response.status(500).json(err.toString())
-                logger.log("Query sql finished with errors")
+                logger.info("Query sql finished with errors")
                 return;
             }
             else {
                 response.send(res.rows.filter(obj => objectFilter(obj, prefix, bucket, visibility)).map(obj => obj.element && obj.name.split(".").pop() == "csv" ? { ...obj, element: json2csv(obj.element) } : obj))
-                logger.log(res.rows);
-                logger.log("Query sql finished")
+                logger.info(res.rows);
+                logger.info("Query sql finished")
             }
         });
     }

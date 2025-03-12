@@ -208,7 +208,7 @@ module.exports = {
   },
 
   cleaned(obj) {
-    //logger.log(typeof obj != "string" ? JSON.stringify(obj) : obj)
+    //logger.info(typeof obj != "string" ? JSON.stringify(obj) : obj)
     //return obj
     //return (typeof obj != "string" ? JSON.stringify(obj) : obj).replace(/['"\r\n\s]/g, ''); /['"\r\n]/g /['"]/g
     //return JSON.stringify(JSON.parse((typeof obj != "string" ? JSON.stringify(obj) : obj).replace( /['\r\n]/g, '')));

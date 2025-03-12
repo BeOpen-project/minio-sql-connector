@@ -28,13 +28,13 @@ function logSizeChecker() {
   let stats = fs.statSync(logFile)
   let fileSizeInBytes = stats.size;
   let fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
-  logger.log("Log size is ", fileSizeInMegabytes)
+  logger.info("Log size is ", fileSizeInMegabytes)
   if (fileSizeInMegabytes > 50)
     fs.writeFile(logFile, "", err => {
       if (err) {
         logger.error(err);
       } else {
-        logger.log("Log reset")
+        logger.info("Log reset")
       }
     });
 }
@@ -352,7 +352,7 @@ async function insertInDBs(newObject, record, align) {
 }
 
 function log2(...m) {
-  logger.log(...m)
+  logger.info(...m)
   if (config.writeLogsOnFile) {
     let args = [...m]
     for (let arg of args)
@@ -785,9 +785,9 @@ module.exports = {
         //const mergedValues = [...this.entities.values, ...uniqueValues];
         //const mergedKeys = [...this.entities.keys, ...uniqueKeys];
 
-        //logger.log("Merged Entries:", mergedEntries);
-        //logger.log("Merged Values:", mergedValues);
-        //logger.log("Merged Keys:", mergedKeys);
+        //logger.info("Merged Entries:", mergedEntries);
+        //logger.info("Merged Values:", mergedValues);
+        //logger.info("Merged Keys:", mergedKeys);
 
         this.entities.values = this.entities.values.concat(uniqueValues)
         this.entities.keys = this.entities.keys.concat(uniqueKeys)

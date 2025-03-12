@@ -7,8 +7,8 @@ const logger = new Logger("controller")
 
 const queryMongo = async (req, res) => {
     if (req.headers.israwquery)
-        return await res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)) && logger.log("Raw query finished")
-    logger.log("Query mongo")
+        return await res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)) && logger.info("Raw query finished")
+    logger.info("Query mongo")
     logger.debug("format ", req.query.format)
     if (req.query.format == "JSON") {
         let objectQuerySet = JSON.parse(JSON.stringify(req.body.mongoQuery || req.query))
@@ -28,15 +28,15 @@ const queryMongo = async (req, res) => {
     }
     else
         res.send(await service.mongoQuery({ ...req.body.mongoQuery, ...req.query }, req.body.prefix, req.body.bucketName, req.headers.visibility))
-    logger.log("Query mongo finished")
+    logger.info("Query mongo finished")
 
 }
 
 const querySQL = async (req, res) => {
-    logger.log("Query sql")
+    logger.info("Query sql")
     if (!req.body.query)
         return await res.status(400).send("Missing query")
-    logger.log("Query : ", req.body.query)
+    logger.info("Query : ", req.body.query)
     service.querySQL(res, req.body.query, req.body.prefix, req.body.bucketName, req.headers.visibility)
 }
 
@@ -45,14 +45,14 @@ module.exports = {
     queryMongo, querySQL,
 
     query: async (req, res) => {
-        logger.log("Query: \n", req.query, "\n","Body : \n", req.body)
+        logger.info("Query: \n", req.query, "\n","Body : \n", req.body)
         if (req.body.mongoQuery)
             return await queryMongo(req, res)
         querySQL(req, res)
     },
 
     getValues: async (req, res) => {
-        logger.log("values")
+        logger.info("values")
         try {
             res.send(await service.getValues())
         }
@@ -63,7 +63,7 @@ module.exports = {
     },
 
     getEntries: async (req, res) => {
-        logger.log("values")
+        logger.info("values")
         try {
             res.send(await service.getEntries())
         }
@@ -74,7 +74,7 @@ module.exports = {
     },
 
     getKeys: async (req, res) => {
-        logger.log("keys")
+        logger.info("keys")
         try {
             res.send(await service.getKeys())
         }
@@ -85,7 +85,7 @@ module.exports = {
     },
 
     sync: async (req, res) => {
-        logger.log("Sync")
+        logger.info("Sync")
         return await res.send(await service.sync())
     },
 
