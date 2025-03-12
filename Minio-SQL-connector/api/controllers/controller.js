@@ -65,7 +65,7 @@ module.exports = {
     getEntries: async (req, res) => {
         logger.info("values")
         try {
-            res.send(await service.getEntries())
+            res.send(await service.getEntries(req.body.prefix, req.body.bucketName, req.headers.visibility))
         }
         catch (error) {
             logger.error(error)

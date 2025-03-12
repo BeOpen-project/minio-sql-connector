@@ -345,8 +345,89 @@ module.exports = {
         return await Value.find()
     },
 
-    async getEntries() {
-        return await Entries.find()
+    async getEntries(prefix, bucketName, visibility) {
+        //return await Entries.find()
+        if (visibility == private) 
+            visibility = prefix.split("/")[0]
+        else if (visibility == "shared")
+            visibility = bucketName.toUpperCase() + " SHARED data"
+        else
+            visibility = "public-data"
+
+        return await Entries.aggregate([
+            {
+                "$project": {
+                    "root": {
+                        "$objectToArray": "$$ROOT"
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "root": {
+                        "$map": {
+                            "input": "$root",
+                            "as": "main",
+                            "in": {
+                                "k": "$$main.k",
+                                "v": {
+                                    "$map": {
+                                        "input": { "$objectToArray": "$$main.v" },
+                                        "as": "outer",
+                                        "in": {
+                                            "k": "$$outer.k",
+                                            "v": {
+                                                "$filter": {
+                                                    "input": "$$outer.v",
+                                                    "as": "inner",
+                                                    "cond": { "$eq": ["$$inner", visibility] }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "root": {
+                        "$map": {
+                            "input": "$root",
+                            "as": "main",
+                            "in": {
+                                "k": "$$main.k",
+                                "v": {
+                                    "$arrayToObject": {
+                                        "$filter": {
+                                            "input": "$$main.v",
+                                            "as": "outer",
+                                            "cond": { "$gt": [{ "$size": "$$outer.v" }, 0] }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "final": {
+                        "$arrayToObject": {
+                            "$filter": {
+                                "input": "$root",
+                                "as": "main",
+                                "cond": { "$gt": [{ "$size": { "$objectToArray": "$$main.v" } }, 0] }
+                            }
+                        }
+                    }
+                }
+            }
+        ])
+
     },
 
 
