@@ -81,7 +81,7 @@ function deleteOldLogs() {
   });
 }
 
-const LEVEL = process.env.LEVEL?.toLowerCase() || config.logLevel || "trace";
+const LEVEL = process.env.LEVEL?.toLowerCase() || config.logLevel || "error";
 
 function saveLog(log) {
   if (config.saveLog)
