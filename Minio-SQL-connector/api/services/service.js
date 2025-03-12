@@ -134,7 +134,7 @@ async function sync() {
                 value: Object.keys(obj[Object.keys(obj).pop()]).pop()
             }))
             let keysToDB = entries.map(obj => ({
-                key: Object.keys(obj).pop(),
+                key: Object.keys(obj).pop() || "flag_error_key_missing",
                 visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
 
             })
