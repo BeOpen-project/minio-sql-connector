@@ -90,8 +90,15 @@ async function sync() {
 
             //const existingEntries = await Entries.find({ key: { $in: Object.keys(minioWriter.entries) } }); //TODO now this line is useless
 
-            let entries = Object.entries(minioWriter.entries).map(([key, value]) => ({ [key]: value }));
-
+            //let entries = Object.entries(minioWriter.entries).map(([key, value]) => ({ [key]: value }));
+            let entries = []
+            for (let key in minioWriter.entries)
+                for (let value in minioWriter.entries[key])
+                    entries.push({
+                        key,
+                        value,
+                        visibility: minioWriter.entries[key][value]
+                    })
             try {
                 if (entries.length > 0) await Entries.insertMany(entries);
             } catch (error) {
@@ -347,87 +354,14 @@ module.exports = {
 
     async getEntries(prefix, bucketName, visibility) {
         //return await Entries.find()
-        if (visibility == "private") 
+        if (visibility == "private")
             visibility = prefix.split("/")[0]
         else if (visibility == "shared")
             visibility = bucketName.toUpperCase() + " SHARED Data"
         else
             visibility = "public-data"
-
-        return await Entries.aggregate([
-            {
-                "$project": {
-                    "root": {
-                        "$objectToArray": "$$ROOT"
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "root": {
-                        "$map": {
-                            "input": "$root",
-                            "as": "main",
-                            "in": {
-                                "k": "$$main.k",
-                                "v": {
-                                    "$map": {
-                                        "input": { "$objectToArray": "$$main.v" },
-                                        "as": "outer",
-                                        "in": {
-                                            "k": "$$outer.k",
-                                            "v": {
-                                                "$filter": {
-                                                    "input": "$$outer.v",
-                                                    "as": "inner",
-                                                    "cond": { "$eq": ["$$inner", visibility] }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "root": {
-                        "$map": {
-                            "input": "$root",
-                            "as": "main",
-                            "in": {
-                                "k": "$$main.k",
-                                "v": {
-                                    "$arrayToObject": {
-                                        "$filter": {
-                                            "input": "$$main.v",
-                                            "as": "outer",
-                                            "cond": { "$gt": [{ "$size": "$$outer.v" }, 0] }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "final": {
-                        "$arrayToObject": {
-                            "$filter": {
-                                "input": "$root",
-                                "as": "main",
-                                "cond": { "$gt": [{ "$size": { "$objectToArray": "$$main.v" } }, 0] }
-                            }
-                        }
-                    }
-                }
-            }
-        ])
-
+        console.debug(visibility)
+        return await Entries.find({ visibility })
     },
 
 
