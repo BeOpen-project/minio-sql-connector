@@ -76,7 +76,12 @@ async function sync() {
         minioWriter.entities.uniqueEntries = []
 
         for (let obj of objects)
-            await minioWriter.insertInDBs(obj.raw, obj.info, true)
+            try {
+                await minioWriter.insertInDBs(obj.raw, obj.info, true)
+            }
+            catch (error) {
+                logger.error(error)
+            }
 
         //minioWriter.entities.values = minioWriter.entities.values.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
         //minioWriter.entities.keys = minioWriter.entities.keys.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
@@ -200,6 +205,7 @@ async function sync() {
         }
         syncing = false
         logger.info("Syncing finished")
+        console.info("Syncing finished")
         return "Sync finished"
     }
     else {
