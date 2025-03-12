@@ -90,17 +90,17 @@ async function sync() {
 
             //const existingEntries = await Entries.find({ key: { $in: Object.keys(minioWriter.entries) } }); //TODO now this line is useless
 
-            //let entries = Object.entries(minioWriter.entries).map(([key, value]) => ({ [key]: value }));
-            let entries = []
+            let entries = Object.entries(minioWriter.entries).map(([key, value]) => ({ [key]: value }));
+            let entriesInDB = []
             for (let key in minioWriter.entries)
                 for (let value in minioWriter.entries[key])
-                    entries.push({
+                    entriesInDB.push({
                         key,
                         value,
                         visibility: minioWriter.entries[key][value]
                     })
             try {
-                if (entries.length > 0) await Entries.insertMany(entries);
+                if (entriesInDB.length > 0) await Entries.insertMany(entriesInDB);
             } catch (error) {
                 if (!error?.errorResponse?.message?.includes("Document can't have")) {
                     log(error);
@@ -344,12 +344,26 @@ function objectFilter(obj, prefix, bucket, visibility) {
 
 module.exports = {
 
-    async getKeys() {
-        return await Key.find()
+    async getKeys(prefix, bucketName, visibility) {
+        if (visibility == "private")
+            visibility = prefix.split("/")[0]
+        else if (visibility == "shared")
+            visibility = bucketName.toUpperCase() + " SHARED Data"
+        else
+            visibility = "public-data"
+        console.debug(visibility)
+        return await Key.find({ visibility }, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
-    async getValues() {
-        return await Value.find()
+    async getValues(prefix, bucketName, visibility) {
+        if (visibility == "private")
+            visibility = prefix.split("/")[0]
+        else if (visibility == "shared")
+            visibility = bucketName.toUpperCase() + " SHARED Data"
+        else
+            visibility = "public-data"
+        console.debug(visibility)
+        return await Value.find({ visibility }, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
     async getEntries(prefix, bucketName, visibility) {
@@ -361,7 +375,7 @@ module.exports = {
         else
             visibility = "public-data"
         console.debug(visibility)
-        return await Entries.find({ visibility })
+        return await Entries.find({ visibility }, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
 
