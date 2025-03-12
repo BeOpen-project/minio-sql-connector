@@ -133,7 +133,7 @@ module.exports = {
     logger.trace(JSON.stringify(obj).substring(0, 30))
     //await sleep(100)
     obj = obj[0].json || obj[0].csv
-    if (obj[0].properties)
+    if (obj[0]?.properties)
       obj = obj.map(o => o.properties)
     //let entries = []
     for (let o of obj)
