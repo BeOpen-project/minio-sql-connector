@@ -352,7 +352,7 @@ module.exports = {
         else
             visibility = "public-data"
         console.debug(visibility)
-        return await Key.find({ visibility }, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        return await Key.find({ visibility })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
     async getValues(prefix, bucketName, visibility) {
@@ -363,7 +363,7 @@ module.exports = {
         else
             visibility = "public-data"
         console.debug(visibility)
-        return await Value.find({ visibility }, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        return await Value.find({ visibility })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
     async getEntries(prefix, bucketName, visibility) {
@@ -375,7 +375,7 @@ module.exports = {
         else
             visibility = "public-data"
         console.debug(visibility)
-        return await Entries.find({ visibility }, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        return await Entries.find({ visibility })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
 
