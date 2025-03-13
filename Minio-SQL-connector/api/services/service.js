@@ -136,10 +136,23 @@ async function sync() {
                 }
             }
 
-            let valuesToDB = entries.map(obj => ({
+            let valuesToDB = []
+
+            //console.log(entries)
+            for (let entry of entries)
+                for (let key in entry)
+                    for (let subKeyAliasValue in entry[key]) {
+                        let existingEntry = valuesToDB.find(v => v.value === subKeyAliasValue)
+                        if (existingEntry)
+                            existingEntry.visibility = [...new Set([...existingEntry.visibility, ...entry[key][subKeyAliasValue]])]
+                        else
+                            valuesToDB.push({ value: subKeyAliasValue, visibility: entry[key][subKeyAliasValue] })
+                    }
+
+            /*let valuesToDB = entries.map(obj => ({
                 visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
                 value: Object.keys(obj[Object.keys(obj).pop()]).pop()
-            }))
+            }))*/
             let keysToDB = entries.map(obj => ({
                 key: Object.keys(obj).pop() || "flag_error_key_missing",
                 visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
