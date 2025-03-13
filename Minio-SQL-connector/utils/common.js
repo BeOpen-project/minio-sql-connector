@@ -70,7 +70,7 @@ function syncEntries(obj, visibility, entries) {
       entries[key] = { [stringify(obj[key])]: [visibility] }
     else if (!entries[key][stringify(obj[key])])
       entries[key][stringify(obj[key])] = [visibility]
-    else
+    else if (!entries[key][stringify(obj[key])].includes(visibility))
       entries[key][stringify(obj[key])].push(visibility)
 }
 
