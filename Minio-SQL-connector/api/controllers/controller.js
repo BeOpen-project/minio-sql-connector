@@ -54,7 +54,7 @@ module.exports = {
     getValues: async (req, res) => {
         logger.info("values")
         try {
-            res.send(await service.getValues(req.body.prefix, req.body.bucketName, req.headers.visibility))
+            res.send(await service.getValues(req.body.prefix, req.body.bucketName, req.headers.visibility, req.query.value))
         }
         catch (error) {
             logger.error(error)
@@ -65,7 +65,7 @@ module.exports = {
     getEntries: async (req, res) => {
         logger.info("values")
         try {
-            res.send(await service.getEntries(req.body.prefix, req.body.bucketName, req.headers.visibility))
+            res.send(await service.getEntries(req.body.prefix, req.body.bucketName, req.headers.visibility, req.query.key, req.query.value))
         }
         catch (error) {
             logger.error(error)
@@ -76,7 +76,7 @@ module.exports = {
     getKeys: async (req, res) => {
         logger.info("keys")
         try {
-            res.send(await service.getKeys(req.body.prefix, req.body.bucketName, req.headers.visibility))
+            res.send(await service.getKeys(req.body.prefix, req.body.bucketName, req.headers.visibility, req.query.key))
         }
         catch (error) {
             logger.error(error)

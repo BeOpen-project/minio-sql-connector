@@ -357,7 +357,7 @@ function objectFilter(obj, prefix, bucket, visibility) {
 
 module.exports = {
 
-    async getKeys(prefix, bucketName, visibility) {
+    async getKeys(prefix, bucketName, visibility, search) {
         if (visibility == "private")
             visibility = prefix.split("/")[0]
         else if (visibility == "shared")
@@ -366,12 +366,12 @@ module.exports = {
             visibility = "public-data"
         console.debug(visibility)
         return await Key.find({
-            "key": { $regex: "^a", $options: "i" },
+            key: { $regex: "^"+ search, $options: "i" },
             visibility
-        }, { "key": 1})//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        }, { "key": 1 })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
-    async getValues(prefix, bucketName, visibility) {
+    async getValues(prefix, bucketName, visibility, search) {
         if (visibility == "private")
             visibility = prefix.split("/")[0]
         else if (visibility == "shared")
@@ -380,12 +380,12 @@ module.exports = {
             visibility = "public-data"
         console.debug(visibility)
         return await Value.find({
-            "value": { $regex: "^a", $options: "i" },
+            value: { $regex: "^"+ search, $options: "i" },
             visibility
-        }, {  "value": 1 })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        }, { "value": 1 })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
     },
 
-    async getEntries(prefix, bucketName, visibility) {
+    async getEntries(prefix, bucketName, visibility, searchKey, searchValue) {
         //return await Entries.find()
         if (visibility == "private")
             visibility = prefix.split("/")[0]
@@ -395,8 +395,8 @@ module.exports = {
             visibility = "public-data"
         console.debug(visibility)
         return await Entries.find({
-            "key": { $regex: "^a", $options: "i" },
-            "value": { $regex: "^a", $options: "i" },
+            "key": { $regex: "^"+ searchKey, $options: "i" },
+            "value": { $regex: "^"+ searchValue, $options: "i" },
             visibility
         }, { "key": 1, "value": 1 })
     },
