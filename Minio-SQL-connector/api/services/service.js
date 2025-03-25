@@ -365,10 +365,13 @@ module.exports = {
         else
             visibility = "public-data"
         console.debug(visibility)
-        return await Key.find({
-            key: { $regex: "^"+ search, $options: "i" },
+        let keys = await Key.find({
+            key: { $regex: "^" + search, $options: "i" },
             visibility
-        }, { "key": 1 })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        }, { "key": 1, "_id": 0 })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        if (keys.lenght > 500)
+            return ["Too many suggestions. Type some characters in order to reduce them"]
+        return keys
     },
 
     async getValues(prefix, bucketName, visibility, search) {
@@ -379,10 +382,13 @@ module.exports = {
         else
             visibility = "public-data"
         console.debug(visibility)
-        return await Value.find({
-            value: { $regex: "^"+ search, $options: "i" },
+        let values = await Value.find({
+            value: { $regex: "^" + search, $options: "i" },
             visibility
-        }, { "value": 1 })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        }, { "value": 1, "_id": 0 })//, { "key": 1, "value": 1, "_id": 0, "visibility":0 })
+        if (values.lenght > 500)
+            return ["Too many suggestions. Type some characters in order to reduce them"]
+        return values
     },
 
     async getEntries(prefix, bucketName, visibility, searchKey, searchValue) {
@@ -394,11 +400,14 @@ module.exports = {
         else
             visibility = "public-data"
         console.debug(visibility)
-        return await Entries.find({
-            "key": { $regex: "^"+ searchKey, $options: "i" },
-            "value": { $regex: "^"+ searchValue, $options: "i" },
+        let entries = await Entries.find({
+            "key": { $regex: "^" + searchKey, $options: "i" },
+            "value": { $regex: "^" + searchValue, $options: "i" },
             visibility
-        }, { "key": 1, "value": 1 })
+        }, { "key": 1, "value": 1, "_id": 0 })
+        //if (entries.lenght > 500)
+        //    return ["Too many suggestions. Type some characters in order to reduce them"]
+        return entries
     },
 
 
