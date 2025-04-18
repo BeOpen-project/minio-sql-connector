@@ -220,7 +220,7 @@ module.exports = {
       owner = "unknown"
     }
     log("Owner ", owner)
-    record = { ...record, owner: owner }
+    record = { ...record, insertedBy: owner }
     this.client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", async (err, res) => {
       if (err) {
         log("ERROR searching object in DB");
