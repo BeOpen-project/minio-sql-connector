@@ -4,9 +4,6 @@ const { sleep, getEntries, setType } = common
 const config = require('../config.js')
 const { minioConfig, delays, queryAllowedExtensions } = config
 const Source = require('../api/models/source.js')//TODO divide collections by email and/or bucket
-const Key = require('../api/models/key.js')
-const Entries = require('../api/models/entries.js')
-const Value = require('../api/models/value.js')
 let minioClient = new Minio.Client(minioConfig)
 const fs = require('fs');
 const logFile = 'log.txt';
@@ -15,14 +12,7 @@ const Log = require('./logger')//.app(module);
 const { Logger } = Log
 const logger = new Logger("miniowriter")
 const log = logger.info
-let entities = {
-  values: [],
-  uniqueValues: [],
-  entries: [],
-  uniqueEntries: [],
-  keys: [],
-  uniqueKeys: []
-}
+const axios = require('axios')
 
 function logSizeChecker() {
   let stats = fs.statSync(logFile)
@@ -39,318 +29,6 @@ function logSizeChecker() {
     });
 }
 
-async function save(objects) {
-  entities.values = []
-  entities.keys = []
-  entities.entries = []
-  entities.uniqueValues = []
-  entities.uniqueKeys = []
-  entities.uniqueEntries = []
-
-  for (let obj of objects)
-    await insertInDBs(obj.raw, obj.info, true)
-
-  const existingValues = (await Value.find({}, { value: 1, _id: 0 })).map(v => v.value);
-  const existingKeys = (await Key.find({}, { key: 1, _id: 0 })).map(k => k.key);
-  const existingEntries = await Entries.find({ key: { $in: entities.entries.map(e => e.key) } }, { key: 1, value: 1, _id: 0 });
-
-  const existingValuesSet = new Set(existingValues);
-  const existingKeysSet = new Set(existingKeys);
-
-  const existingMap = new Map();
-  existingEntries.forEach(e => {
-    if (!existingMap.has(e.key)) {
-      existingMap.set(e.key, new Set());
-    }
-    existingMap.get(e.key).add(e.value);
-  });
-
-  const uniqueValues = entities.values.filter(value => !existingValuesSet.has(value.value));
-  const uniqueKeys = entities.keys.filter(key => !existingKeysSet.has(key.key));
-  const uniqueEntries = entities.entries.filter(entry => !existingMap.has(entry.key) || !existingMap.get(entry.key).has(entry.value));
-
-  try {
-    if (uniqueValues.length > 0) await Value.insertMany(uniqueValues);
-  }
-  catch (error) {
-    if (!error?.errorResponse?.message?.includes("Document can't have"))
-      log(error)
-    else
-      try {
-        await Value.insertMany(uniqueValues.map(v => ({ value: v.value.replace(/\$/g, '') })))
-      }
-      catch (error) {
-        log("There are problems inserting object in mongo DB")
-        log(error)
-      }
-  }
-  try {
-    if (uniqueKeys.length > 0) await Key.insertMany(uniqueKeys);
-  }
-  catch (error) {
-    if (!error?.errorResponse?.message?.includes("Document can't have"))
-      log(error)
-    else
-      try {
-        await Key.insertMany(uniqueKeys.map(k => ({ key: k.key.replace(/\$/g, '') })))
-      }
-      catch (error) {
-        log("There are problems inserting object in mongo DB")
-        log(error)
-      }
-  }
-  try {
-    if (uniqueEntries.length > 0) await Entries.insertMany(uniqueEntries);
-  }
-  catch (error) {
-    if (!error?.errorResponse?.message?.includes("Document can't have"))
-      log(error)
-    else
-      try {
-        await Entries.insertMany(uniqueEntries.map(e => ({ key: e.key.replace(/\$/g, ''), value: e.value.replace(/\$/g, '') })))
-      }
-      catch (error) {
-        log("There are problems inserting object in mongo DB")
-        log(error)
-      }
-  }
-}
-
-async function insertInDBs(newObject, record, align) {
-  log("Insert in DBs ", record?.s3?.object?.key || record.name)
-  let csv = false
-  let jsonParsed, jsonStringified, postgreFinished, logCounterFlag
-  if (typeof newObject != "object")
-    try {
-      //log("New object\n")//, common.minify(newObject), "\ntype : ", typeof newObject)
-      jsonParsed = JSON.parse(newObject)
-      //log("Now is a json")
-    }
-    catch (error) {
-      //log("Not a json")
-      //log(error)
-      let extension = (record?.s3?.object?.key || record.name).split(".").pop()
-      if (extension == "csv")
-        jsonStringified = common.convertCSVtoJSON(newObject)
-      csv = true
-    }
-  else {
-    //log("Already a json")
-    jsonParsed = newObject
-  }
-
-  let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
-  //log(record)
-  //log("Before postgre query", common.minify(record?.s3?.object))
-  //log(common.minify(JSON.stringify(jsonStringified || common.cleaned(newObject))))
-  let queryName = record?.s3?.object?.key || record.name
-  let queryTable = this.createTable(table)
-  let data = (jsonStringified || common.cleaned(newObject))
-  if (typeof data != "string")
-    data = JSON.stringify(data)
-  //let comp1 = JSON.stringify(record)
-  //logger.debug(data.substring(0,10),"...\n", comp1.substring(0,10), "...")
-  //log("Query name", queryName)
-  //queryName.replace(/ /g, '');
-
-  this.client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", async (err, res) => {
-    if (err) {
-      log("ERROR searching object in DB");
-      log(err);
-
-      //new
-      //this.client.query(queryTable, (err, res) => {
-      //
-
-      //old
-      this.client.query("CREATE TABLE  " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)", (err, res) => {
-        //
-
-        if (err) {
-          log("ERROR creating table");
-          log(err);
-          postgreFinished = true
-          return;
-        }
-        //log(common.minify(res))
-
-        //old
-        this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}')`, (err, res) => {
-          //
-
-          //new
-          //this.client.query(`INSERT INTO ${table} (name, ${this.getKeys(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', ${this.getValues(jsonStringified || common.cleaned(newObject))}, '${JSON.stringify(record)}')`, (err, res) => {
-          //or
-          //this.client.query(`INSERT INTO ${table} (name, ${this.getValues(queryTable)}, record) VALUES ('${record?.s3?.object?.key || record.name}', '${JSON.stringify(jsonStringified || common.cleaned(newObject))}', '${JSON.stringify(record)}')`, (err, res) => {
-          //
-
-          if (err) {
-            log("ERROR inserting object in DB");
-            log(err);
-            postgreFinished = true
-            return;
-          }
-          log("Object inserted \n");
-          postgreFinished = true
-          return
-        });
-
-      });
-      while (!postgreFinished) { //TODO create a function for this
-        await sleep(delays)
-        if (!logCounterFlag) {
-          logCounterFlag = true
-          sleep(delays + 2000).then(resolve => {
-            if (!postgreFinished)
-              log("waiting for inserting object in postgre")
-            logCounterFlag = false
-          })
-        }
-      }
-      if (postgreFinished)
-        return postgreFinished
-    }
-    if (res.rows[0]) {
-      log("Objects found \n ")//, common.minify(res.rows));
-      this.client.query(`UPDATE ${table} SET data = '${data}', record = '${JSON.stringify(record)}'  WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
-        if (err) {
-          log("ERROR updating object in DB");
-          log(err);
-          postgreFinished = true
-          return;
-        }
-        postgreFinished = true
-        log("Object updated \n");
-        return
-      });
-    }
-    else
-      this.client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}' )`, (err, res) => {
-        if (err) {
-          log("ERROR inserting object in DB");
-          log(err);
-          postgreFinished = true
-          return;
-        }
-        log("Object inserted \n");
-        postgreFinished = true
-        return
-      });
-
-  });
-
-  if ((!jsonParsed) || (jsonParsed && typeof jsonParsed != "object"))
-    try {
-      jsonParsed = JSON.parse(jsonStringified || newObject)
-    }
-    catch (error) {
-      log(error)
-    }
-
-  try {// TODO better doing an update...
-    log("Delete ", (record?.s3?.object?.key || record.name))
-    await Source.deleteMany({ 'name': (record?.s3?.object?.key || record.name) })//record.s3.object
-  }
-  catch (error) {
-    log(error)
-  }
-  //log(record)
-  let name = record?.s3?.object?.key || record.name
-  name = name.split(".")
-  let extension = name.pop()
-  log("Extension ", extension)
-  log("Is array : ", Array.isArray(jsonParsed))
-  log("Type ", typeof jsonParsed)
-  //log("This is the file \n", common.minify(jsonParsed))
-  //log("Here's details \n", record)
-  if (!jsonParsed)
-    log("Empty object of extension ", extension)
-
-  let insertingSource = [
-    extension == "csv" ?
-      { csv: jsonParsed, record, name: record?.s3?.object?.key || record.name } :
-      Array.isArray(jsonParsed) ?
-        { json: jsonParsed, record, name: record?.s3?.object?.key || record.name } :
-        typeof jsonParsed == "object" ?
-          { ...jsonParsed, record, name: record?.s3?.object?.key || record.name } :
-          { raw: jsonParsed, record, name: record?.s3?.object?.key || record.name }
-  ]
-  try {
-    await Source.insertMany(insertingSource)
-  }
-  catch (error) {
-    if (!error?.errorResponse?.message?.includes("Document can't have"))
-      log(error)
-    //log("Probably there are some special characters not allowed")
-    try {
-      await Source.insertMany(JSON.parse(JSON.stringify(insertingSource).replace(/\$/g, '')))
-      //log("Indeed")
-    }
-    catch (error) {
-      log("There are problems inserting object in mongo DB")
-      log(error)
-    }
-  }
-  logger.trace("before get type")
-  logger.trace(JSON.stringify(jsonParsed).substring(0, 30))
-  //await sleep(100)
-  let type = await setType(extension, jsonParsed) // csv, jsonArray, json, raw
-  let entries
-  logger.trace("type")
-  logger.trace(type)
-  //await sleep(100)
-  if (type != "raw")
-    try {
-      entries = await getEntries(insertingSource, type)
-      log("entries ", entries != undefined)
-      //const { keys, values } = entries
-      //let values = getValues(obj, type)
-      logger.trace("entries\n", JSON.stringify(entries).substring(0, 30))
-      //await sleep(100)
-      entities.values = entities.values.concat(entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-      entities.keys = entities.keys.concat(entries.map(e => ({ key: e.key })))
-      entities.entries = entities.entries.concat(entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-
-      /*await insertUniqueEntries(entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-      await insertUniqueKeys(entries.map(e => ({ key: e.key })))
-      await insertUniqueValues(entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))*/
-
-    }
-    catch (error) {
-      if (!error?.errorResponse?.message?.includes("Document can't have"))
-        log(error)
-      //log("Probably there are some special characters not allowed")
-      try {
-        //const { keys, values } = entries
-        let cleanedEntries = JSON.parse(JSON.stringify(entries).replace(/\$/g, ''))
-        await insertUniqueEntries(cleanedEntries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-        await insertUniqueKeys(cleanedEntries.map(e => ({ key: e.key })))
-        await insertUniqueValues(cleanedEntries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-        //await Entries.insertMany(JSON.parse(JSON.stringify(entries).replace(/\$/g, '')))
-        //await Value.insertMany(JSON.parse(JSON.stringify(values).replace(/\$/g, '')))
-        //log("Indeed")
-      }
-      catch (error) {
-        log("There are problems inserting object in mongo DB")
-        log(error)
-        //await sleep(100)
-      }
-    }
-  while (!postgreFinished) {
-    await sleep(delays)
-    if (!logCounterFlag) {
-      logCounterFlag = true
-      sleep(delays + 2000).then(resolve => {
-        if (!postgreFinished)
-          log("object inserted in mongo db but still waiting for inserting object in postgre")
-        logCounterFlag = false
-      })
-    }
-  }
-  if (postgreFinished)
-    return postgreFinished
-}
-
 function log2(...m) {
   logger.info(...m)
   if (config.writeLogsOnFile) {
@@ -362,42 +40,6 @@ function log2(...m) {
         logStream.write(arg + '\n');
   }
 }
-
-async function insertUniqueValues(values) {
-  for (let value of values)
-    if (!(await Value.find({ value: value.value }))[0])
-      await Value.insertMany([value])
-    else
-      logger.trace(value.value, " already exists")
-}
-async function insertUniqueEntries(entries) {
-  for (let entry of entries)
-    if (!(await Entries.find({ value: entry.value, key: entry.key }))[0])
-      await Entries.insertMany([entry])
-    else
-      logger.trace(entry, " already exists")
-}
-async function insertUniqueKeys(keys) {
-  for (let key of keys)
-    if (!(await Key.find({ key: key.key }))[0])
-      await Key.insertMany([key])
-    else
-      logger.trace(key.key, " already exists")
-}
-
-/*
-ciclo padre di inserimento dati su db 
-  entities.values.push(values)
-  entities.keys.push(keys)
-  entities.entries.push(entries)
-let valuesInDB = (await Value.find()).map(v => v.value)
-...
-for (let value of entities.values)
-  if (!valuesInDB.includes(value.value))
-    await Value.insertMany([value])
-...
-*/
-
 
 if (config.writeLogsOnFile)
   setInterval(logSizeChecker, 3600000)
@@ -426,23 +68,18 @@ module.exports = {
 
     var data = []
     var stream = minioClient.listObjects(bucketName, '', true, { IncludeVersion: true })
-    //var stream = minioClient.extensions.listObjectsV2WithMetadata(bucketName, '', true, '')
     stream.on('data', function (obj) {
-      //log(bucketName)
-      //log(common.minify(obj))
       data.push(obj)
     })
     stream.on('end', function (obj) {
       if (!obj)
         log("ListObjects ended returning an empty object")
       else
-        log("Found object ")// + common.minify(JSON.stringify(obj)))
+        log("Found object ")
       if (data[0])
-        //log(common.minify(JSON.stringify(data)))
         resultMessage = data
       else if (!resultMessage)
         resultMessage = []
-      //process.res.send(data)
     })
     stream.on('error', function (err) {
       log(err)
@@ -507,7 +144,7 @@ module.exports = {
     if (!Array.isArray(obj))
       for (let key in obj)
         if (Array.isArray())
-          type = "array"//this.getTypeRecurssive(obj[key])
+          type = "array"
         else
           switch (type = obj[key]) {
             case "number": query = query + "INTEGER,"; break;
@@ -532,13 +169,10 @@ module.exports = {
           switch (typeof obj[key]) {
             case "number": query = query + ", " + key + " INTEGER"; break;
             case "string": query = query + ", " + key + " TEXT"; break;
-            //case "array": query = query + this.getTypeRecursive(obj[key]); break; // e.g. INTEGER[]
             case "object": query = query + ", " + key + " JSONB"; break;
             case "boolean": query = query + ", " + key + " BOOLEAN"; break;
           }
     query = query + ", record JSONB)"
-    //if (Array.isArray(obj))
-    //  for (let )
     return query
   },
 
@@ -550,51 +184,43 @@ module.exports = {
 
   },
 
-  /*
-  async entriesToDB(entries){
-    let found = Entries.find()
-    await Entries.insertMany(entries)
-    await Key.insertMany(entries.map(e => ({key : e.key})))
-    await Value.insertMany(entries.map(e => ({value : typeof e.value == "object" ? JSON.stringify(e.value) : e.value})))
-  },*/
-
   async insertInDBs(newObject, record, align) {
     log("Insert in DBs ", record?.s3?.object?.key || record.name)
     let csv = false
     let jsonParsed, jsonStringified, postgreFinished, logCounterFlag
     if (typeof newObject != "object")
       try {
-        //log("New object\n")//, common.minify(newObject), "\ntype : ", typeof newObject)
         jsonParsed = JSON.parse(newObject)
-        //log("Now is a json")
       }
       catch (error) {
-        //log("Not a json")
-        //log(error)
+
         let extension = (record?.s3?.object?.key || record.name).split(".").pop()
         if (extension == "csv")
           jsonStringified = common.convertCSVtoJSON(newObject)
         csv = true
       }
     else {
-      //log("Already a json")
       jsonParsed = newObject
     }
 
     let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
-    //log(record)
-    //log("Before postgre query", common.minify(record?.s3?.object))
-    //log(common.minify(JSON.stringify(jsonStringified || common.cleaned(newObject))))
+  
     let queryName = record?.s3?.object?.key || record.name
     let queryTable = this.createTable(table)
     let data = (jsonStringified || common.cleaned(newObject))
     if (typeof data != "string")
       data = JSON.stringify(data)
-    //let comp1 = JSON.stringify(record)
-    //logger.debug(data.substring(0,10),"...\n", comp1.substring(0,10), "...")
-    //log("Query name", queryName)
-    //queryName.replace(/ /g, '');
-
+    let owner  
+    try{
+      owner = (await axios.get(config.ownerInfoEndpoint+"/createdBy?filePath=" + queryName + "&etag=" + record.etag)).data
+    }
+    catch (error) {
+      log("Error getting owner")
+      log(error)
+      owner = "unknown"
+    }
+    log("Owner ", owner)
+    record = { ...record, owner: owner }
     this.client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", async (err, res) => {
       if (err) {
         log("ERROR searching object in DB");
@@ -696,15 +322,13 @@ module.exports = {
     catch (error) {
       log(error)
     }
-    //log(record)
     let name = record?.s3?.object?.key || record.name
     name = name.split(".")
     let extension = name.pop()
     log("Extension ", extension)
     log("Is array : ", Array.isArray(jsonParsed))
     log("Type ", typeof jsonParsed)
-    //log("This is the file \n", common.minify(jsonParsed))
-    //log("Here's details \n", record)
+
     if (!jsonParsed)
       log("Empty object of extension ", extension)
 
@@ -723,10 +347,8 @@ module.exports = {
     catch (error) {
       if (!error?.errorResponse?.message?.includes("Document can't have"))
         log(error)
-      //log("Probably there are some special characters not allowed")
       try {
         await Source.insertMany(JSON.parse(JSON.stringify(insertingSource).replace(/\$/g, '')))
-        //log("Indeed")
       }
       catch (error) {
         log("There are problems inserting object in mongo DB")
@@ -735,95 +357,15 @@ module.exports = {
     }
     logger.trace("before get type")
     logger.trace(JSON.stringify(jsonParsed).substring(0, 30))
-    //await sleep(100)
     let type = await setType(extension, jsonParsed) // csv, jsonArray, json, raw
-    let entries
     logger.trace("type")
     logger.trace(type)
-    //await sleep(100)
     if (type != "raw")
       try {
-        //entries = 
         await getEntries(insertingSource, type, record?.s3?.object?.key || record.name, this.entries)
-        //log("entries ", entries != undefined)
-        //const { keys, values } = entries
-        //let values = getValues(obj, type)
-        //logger.trace("entries\n", JSON.stringify(entries).substring(0, 30))
-        //await sleep(100)
-
-        /*
-        let newEntries = entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value, name: e.name }))
-        let newValues = entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value, name: e.name }))
-        let newKeys = entries.map(e => ({ key: e.key, name: e.name }))
-        const existingEntries = new Map();
-        this.entities.entries.forEach(entry => {
-          existingEntries.set(`${entry.key}-${entry.value}-${entry.name}`, true);  // Usa key-value combinato come chiave
-        });
-
-        const uniqueEntries = newEntries.filter(entry =>
-          !existingEntries.has(`${entry.key}-${entry.value}-${entry.name}`)
-        );
-
-        const existingValues = new Map();//new Set(this.entities.values.map(item => item.value));  // Set per un rapido lookup
-        this.entities.values.forEach(value => {
-          existingValues.set(`${value.value}-${value.name}`, true);  // Usa key-value combinato come chiave
-        });
-        const uniqueValues = newValues.filter(value =>
-          !existingValues.has(`${value.value}-${value.name}`)
-        );
-
-        const existingKeys = new Map();//new Set(this.entities.keys.map(item => item.key));  // Set per un rapido lookup
-        this.entities.keys.forEach(key => {
-          existingKeys.set(`${key.key}-${key.name}`, true);  // Usa key-value combinato come chiave
-        });
-        const uniqueKeys = newKeys.filter(key =>
-          !existingKeys.has(`${key.key}-${key.name}`)
-        );
-
-        //const mergedEntries = [...this.entities.entries, ...uniqueEntries];
-        //const mergedValues = [...this.entities.values, ...uniqueValues];
-        //const mergedKeys = [...this.entities.keys, ...uniqueKeys];
-
-        //logger.info("Merged Entries:", mergedEntries);
-        //logger.info("Merged Values:", mergedValues);
-        //logger.info("Merged Keys:", mergedKeys);
-
-        this.entities.values = this.entities.values.concat(uniqueValues)
-        this.entities.keys = this.entities.keys.concat(uniqueKeys)
-        this.entities.entries = this.entities.entries.concat(uniqueEntries)
-        //logger.debug("CONTROLLO SE C' E' NAME", this.entities.values[0])
-        */
-
-        /*this.entities.values = this.entities.values.concat(entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-        this.entities.keys = this.entities.keys.concat(entries.map(e => ({ key: e.key })))
-        this.entities.entries = this.entities.entries.concat(entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))*/
-
-        //logger.debug({ v: this.entities.values.length, k: this.entities.keys.length, e: this.entities.entries.length })
-
-        /*await insertUniqueEntries(entries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-        await insertUniqueKeys(entries.map(e => ({ key: e.key })))
-        await insertUniqueValues(entries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))*/
       }
       catch (error) {
-        logger.error(error)/*
-        if (!error?.errorResponse?.message?.includes("Document can't have"))
-          log(error)
-        //log("Probably there are some special characters not allowed")
-        try {
-          //const { keys, values } = entries
-          let cleanedEntries = JSON.parse(JSON.stringify(entries).replace(/\$/g, ''))
-          await insertUniqueEntries(cleanedEntries.map(e => ({ key: e.key, value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-          await insertUniqueKeys(cleanedEntries.map(e => ({ key: e.key })))
-          await insertUniqueValues(cleanedEntries.map(e => ({ value: typeof e.value != "string" ? JSON.stringify(e.value) : e.value })))
-          //await Entries.insertMany(JSON.parse(JSON.stringify(entries).replace(/\$/g, '')))
-          //await Value.insertMany(JSON.parse(JSON.stringify(values).replace(/\$/g, '')))
-          //log("Indeed")
-        }
-        catch (error) {
-          log("There are problems inserting object in mongo DB")
-          log(error)
-          //await sleep(100)
-        }*/
+        logger.error(error)
       }
     while (!postgreFinished) {
       await sleep(delays)
@@ -839,8 +381,6 @@ module.exports = {
     if (postgreFinished)
       return postgreFinished
   },
-
-  save: save,
 
   getNotifications(bucketName) {
 
@@ -906,23 +446,18 @@ module.exports = {
       });
 
       dataStream.on('end', function () {
-        //log('Object data: ', common.minify(objectData));
         try {
           resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData) : objectData
-          //log("Json parsed")
 
         }
         catch (error) {
-          //log("It was not a json ? \n", error)
           try {
             if (config.parseCompatibilityMode === 1)
               resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData.substring(1)) : objectData
             else
               resultMessage = (format == 'json' && typeof objectData == "string") ? JSON.parse(objectData.substring(objectData.indexOf("{"))) : objectData
-            //log("Json parsed")
           }
           catch (error) {
-            //log("Really it was not a json ? \n", error)
             resultMessage = format == 'json' ? [{ data: objectData }] : objectData
           }
         }
@@ -954,6 +489,5 @@ module.exports = {
       throw errorMessage
     if (resultMessage)
       return resultMessage
-    //})
   }
 }

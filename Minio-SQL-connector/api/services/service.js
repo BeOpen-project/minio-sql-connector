@@ -6,7 +6,6 @@ const Source = require('../models/source')
 const Value = require('../models/value')
 const Key = require('../models/key')
 const Entries = require('../models/entries')
-const common = require('../../utils/common')
 const { sleep, json2csv } = require('../../utils/common')
 const { Client } = require('pg');
 const config = require('../../config')
@@ -28,12 +27,6 @@ else
     for (let bucket of minioConfig.subscribe.buckets)
         minioWriter.getNotifications(bucket)
 
-async function save(objects) {
-    for (let obj of objects)
-        await minioWriter.insertInDBs(obj.raw, obj.info, true)
-    return true
-}
-
 async function sync() {
     try {
         if (!syncing) {
@@ -42,7 +35,6 @@ async function sync() {
             await Key.deleteMany({})
             await Value.deleteMany({})
             await Entries.deleteMany({})
-            //await sleep(10000)
             let objects = []
             let buckets = await minioWriter.listBuckets()
             let bucketIndex = 1
@@ -84,12 +76,6 @@ async function sync() {
                     logger.error(error)
                 }
 
-            //minioWriter.entities.values = minioWriter.entities.values.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
-            //minioWriter.entities.keys = minioWriter.entities.keys.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
-            //minioWriter.entities.entries = minioWriter.entities.entries.map(obj => ({ ...obj, visibility: getVisibility(obj) }))
-
-            //const existingEntries = await Entries.find({ key: { $in: Object.keys(minioWriter.entries) } }); //TODO now this line is useless
-
             let entries = Object.entries(minioWriter.entries).map(([key, value]) => ({ [key]: value }));
             let entriesInDB = []
             for (let key in minioWriter.entries)
@@ -106,7 +92,6 @@ async function sync() {
                     log(error);
                 } else {
                     try {
-                        // Pulizia di `$` solo in nestedKey
                         entries = entries.map(entry => {
                             let fixedEntry = {};
 
@@ -138,7 +123,6 @@ async function sync() {
 
             let valuesToDB = []
 
-            //console.log(entries)
             for (let entry of entries)
                 for (let key in entry)
                     for (let subKeyAliasValue in entry[key]) {
@@ -149,10 +133,6 @@ async function sync() {
                             valuesToDB.push({ value: subKeyAliasValue, visibility: entry[key][subKeyAliasValue] })
                     }
 
-            /*let valuesToDB = entries.map(obj => ({
-                visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
-                value: Object.keys(obj[Object.keys(obj).pop()]).pop()
-            }))*/
             let keysToDB = entries.map(obj => ({
                 key: Object.keys(obj).pop() || "flag_error_key_missing",
                 visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
@@ -162,164 +142,6 @@ async function sync() {
             await Key.insertMany(keysToDB)
             await Value.insertMany(valuesToDB)
 
-
-            /*
-            let entries = Object.entries(minioWriter.entries)
-            entries = entries.map(entry => ({ [entry[0]]: [entry[1]] }))
-            try {
-                if (entries.length > 0) await Entries.insertMany(entries);
-            }
-            catch (error) {
-                if (!error?.errorResponse?.message?.includes("Document can't have"))
-                    log(error)
-                else
-                    try {
-                        for (let entry of entries)
-                            for (let key in entry)
-                                for (let value in entry[key])
-                                    entry[key] = {
-                                        [entry[key][value.replace(/\$/g, '')]]: JSON.parse(JSON.stringify(entry[key][value]))
-                                    }
-                        await Entries.insertMany(entries)
-                    }
-                    catch (error) {
-                        log("There are problems inserting object in mongo DB")
-                        log(error)
-                    }
-            }
-
-            let entries = Object.entries(minioWriter.entries)
-            entries = entries.map(entry => ({ [entry[0]]: entry[1] }))
-            try {
-                if (entries.length > 0) await Entries.insertMany(entries);
-            }
-            catch (error) {
-                if (!error?.errorResponse?.message?.includes("Document can't have"))
-                    log(error)
-                else
-                    try {
-                        for (let entry of entries)
-                            for (let key in entry)
-                                for (let nestedKey in entry[key])
-                                    entry[key] = {
-                                        [entry[key][nestedKey.replace(/\$/g, '')]]: JSON.parse(JSON.stringify(entry[key][nestedKey]))
-                                    }
-                        await Entries.insertMany(entries)
-                    }
-                    catch (error) {
-                        log("There are problems inserting object in mongo DB")
-                        log(error)
-                    }
-            }
-
-            let entries = Object.entries(minioWriter.entries).map(([key, value]) => ({ [key]: value }));
-            try {
-                if (entries.length > 0) await Entries.insertMany(entries);
-            } catch (error) {
-                if (!error?.errorResponse?.message?.includes("Document can't have")) {
-                    log(error);
-                } else {
-                    try {
-                        entries = entries.map(entry => {
-                            let fixedEntry = {};
-                            for (let key in entry) {
-                                let sanitizedKey = key.replace(/\$/g, '');
-                                fixedEntry[sanitizedKey] = entry[key];
-                            }
-                            return fixedEntry;
-                        });
-
-                        await Entries.insertMany(entries);
-                    } catch (error) {
-                        log("There are problems inserting object in MongoDB");
-                        log(error);
-                    }
-                }
-            }*/
-
-
-            /*
-            const existingValues = (await Value.find({ value: { $in: minioWriter.entities.values.map(v => v.value) } }))//.map(v => v.value);
-            const existingKeys = (await Key.find({ key: { $in: minioWriter.entities.keys.map(k => k.key) } }))//.map(k => k.key); //{ key: 1, _id: 0 }
-            const existingValuesMap = new Map();
-            existingValues.forEach(v => {
-                if (!existingValuesMap.has(v.name)) {
-                    existingValuesMap.set(v.name, new Set());
-                }
-                existingValuesMap.get(v.name).add(v.value);
-            });
-            const uniqueValues = existingValues[0] ? minioWriter.entities.values.filter(entry => !existingValuesMap.has(entry.name) || !existingValuesMap.get(entry.name).has(entry.value)) : minioWriter.entities.values;
-            try {
-                if (uniqueValues.length > 0) await Value.insertMany(uniqueValues);
-            }
-            catch (error) {
-                if (!error?.errorResponse?.message?.includes("Document can't have"))
-                    log(error)
-                else
-                    try {
-                        await Value.insertMany(uniqueValues.map(v => ({ value: v.value.replace(/\$/g, '') })))
-                    }
-                    catch (error) {
-                        log("There are problems inserting object in mongo DB")
-                        log(error)
-                    }
-            }
-            const existingKeysMap = new Map();
-            existingKeys.forEach(k => {
-                if (!existingKeysMap.has(k.name)) {
-                    existingKeysMap.set(k.name, new Set());
-                }
-                existingKeysMap.get(k.name).add(k.key);
-            });
-            const uniqueKeys = existingKeys[0] ? minioWriter.entities.keys.filter(entry => !existingKeysMap.has(entry.name) || !existingKeysMap.get(entry.name).has(entry.key)) : minioWriter.entities.keys;
-            try {
-                if (uniqueKeys.length > 0) await Key.insertMany(uniqueKeys);
-            }
-            catch (error) {
-                if (!error?.errorResponse?.message?.includes("Document can't have"))
-                    log(error)
-                else
-                    try {
-                        await Key.insertMany(uniqueKeys.map(k => ({ key: k.key.replace(/\$/g, '') })))
-                    }
-                    catch (error) {
-                        log("There are problems inserting object in mongo DB")
-                        log(error)
-                    }
-            }
-
-            const existingEntriesMap = new Map();
-            existingEntries.forEach(e => {
-                if (!existingEntriesMap.has(e.key)) {
-                    existingEntriesMap.set(e.key, { values: new Set(), names: new Set() });
-                }
-                existingEntriesMap.get(e.key).values.add(e.value);
-                existingEntriesMap.get(e.key).names.add(e.name);
-            });
-            const uniqueEntries = existingEntries[0]
-                ? minioWriter.entities.entries.filter(entry => {
-                    const entryMap = existingEntriesMap.get(entry.key);
-                    return (
-                        !entryMap ||  // Se non esiste una voce con quella 'key', è unica
-                        (!entryMap.values.has(entry.value) && !entryMap.names.has(entry.name)) // Se il valore o il nome non esistono, è unica
-                    );
-                })
-                : minioWriter.entities.entries;
-            try {
-                if (uniqueEntries.length > 0) await Entries.insertMany(uniqueEntries);
-            }
-            catch (error) {
-                if (!error?.errorResponse?.message?.includes("Document can't have"))
-                    log(error)
-                else
-                    try {
-                        await Entries.insertMany(uniqueEntries.map(e => ({ key: e.key.replace(/\$/g, ''), value: e.value.replace(/\$/g, '') })))
-                    }
-                    catch (error) {
-                        log("There are problems inserting object in mongo DB")
-                        log(error)
-                    }
-            }*/
             syncing = false
             logger.info("Syncing finished")
             console.info("Syncing finished")
