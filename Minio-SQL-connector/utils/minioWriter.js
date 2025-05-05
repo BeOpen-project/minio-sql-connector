@@ -212,7 +212,7 @@ module.exports = {
       data = JSON.stringify(data)
     let owner  
     try{
-      owner = (await axios.get(config.ownerInfoEndpoint+"/createdBy?filePath=" + queryName + "&etag=" + record.etag)).data
+      owner = (await axios.get(config.minioConfig.ownerInfoEndpoint+"/createdBy?filePath=" + queryName + "&etag=" + record.etag)).data
     }
     catch (error) {
       logger.error("Error getting owner")

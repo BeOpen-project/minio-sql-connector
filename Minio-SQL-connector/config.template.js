@@ -12,7 +12,8 @@ module.exports = {
     subscribe: {
       all: true,
       buckets: []
-    }
+    },
+    ownerInfoEndpoint: "https://platform.beopendep.it/api/owner"
   },
   postgreConfig: {
     user: '',
@@ -27,7 +28,6 @@ module.exports = {
   delays : 1,
   queryAllowedExtensions : ["csv", "json", "geojson"],
   parseCompatibilityMode : 0,
-  ownerInfoEndpoint: "https://platform.beopendep.it/api/owner",
   mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
   authConfig: {
     idmHost: "https://platform.beopendep.it/auth",
