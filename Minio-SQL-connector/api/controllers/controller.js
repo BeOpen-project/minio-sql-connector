@@ -6,6 +6,7 @@ const logger = new Logger("controller")
 
 
 const queryMongo = async (req, res) => {
+    logger.info(req.body, req.query)
     if (req.headers.israwquery)
         return await res.send(await service.rawQuery(req.query, req.body.prefix, req.body.bucketName, req.headers.visibility)) && logger.info("Raw query finished")
     logger.info("Query mongo")

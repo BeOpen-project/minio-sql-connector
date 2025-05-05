@@ -428,7 +428,7 @@ module.exports = {
 
   async getObject(bucketName, objectName, format) {
 
-    log("Now getting object " + objectName + " in bucket " + bucketName)
+    logger.trace("Now getting object " + objectName + " in bucket " + bucketName)
 
     let resultMessage
     let errorMessage

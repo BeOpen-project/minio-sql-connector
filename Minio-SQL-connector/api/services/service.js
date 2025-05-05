@@ -43,7 +43,7 @@ async function sync() {
                 let index = 1
                 for (let obj of bucketObjects) {
                     try {
-                        await sleep(delays)
+                        //await sleep(delays)
                         logger.debug("Bucket ", bucketIndex, " of ", buckets.length)
                         logger.debug("Scanning object ", index++, " of ", bucketObjects.length, ",", obj.name)
                         let extension = obj.name.split(".").pop()

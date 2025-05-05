@@ -21,6 +21,7 @@ module.exports = {
     password: '',
     port: 5432
   },
+  logLevel: "info",
   syncInterval : 86400000,
   doNotSyncAtStart : false,
   delays : 1,
