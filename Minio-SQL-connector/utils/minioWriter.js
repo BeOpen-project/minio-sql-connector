@@ -215,8 +215,8 @@ module.exports = {
       owner = (await axios.get(config.ownerInfoEndpoint+"/createdBy?filePath=" + queryName + "&etag=" + record.etag)).data
     }
     catch (error) {
-      log("Error getting owner")
-      log(error)
+      logger.error("Error getting owner")
+      logger.error(error)
       owner = "unknown"
     }
     log("Owner ", owner)
