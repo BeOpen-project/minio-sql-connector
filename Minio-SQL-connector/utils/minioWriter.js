@@ -13,14 +13,6 @@ const { Logger } = Log
 const logger = new Logger("miniowriter")
 const log = logger.info
 const axios = require('axios')
-const login = require('./login.js')
-let bearer, authMetod //= login.authenticate()
-exports.bearer = bearer
-exports.authMetod = authMetod
-async function getBearer() {
-  bearer = await login.authenticate()
-}
-getBearer()
 process.queryEngine = {updatedOwners: {}}
 
 function logSizeChecker() {
@@ -221,38 +213,15 @@ module.exports = {
       data = JSON.stringify(data)
     let owner
     try {
-      if (authMetod == "frontend")
+      if (config.updateOwner == "later")
         owner = "unknown"
       else {
-        if (!bearer)
-          bearer = await login.authenticate()
-        owner = (await axios.get(config.minioConfig.ownerInfoEndpoint + "/createdBy?filePath=" + queryName + "&etag=" + record.etag,
-          {
-            headers: {
-              Authorization: bearer
-            }
-          })).data
+        owner = (await axios.get(config.minioConfig.ownerInfoEndpoint + "/createdBy?filePath=" + queryName + "&etag=" + record.etag)).data
       }
     }
     catch (error) {
       logger.error("Error getting owner")
       logger.error(error)
-      bearer = await login.authenticate()
-      try {
-        owner = (await axios.get(config.minioConfig.ownerInfoEndpoint + "/createdBy?filePath=" + queryName + "&etag=" + record.etag,
-          {
-            headers: {
-              Authorization: bearer
-            }
-          })).data
-      }
-      catch (error) {
-        logger.error("Error getting owner")
-        logger.error(error)
-        owner = "unknown"
-        authMetod = "frontend"
-        process.queryEngine.updateOwner = true
-      }
     }
     log("Owner ", owner)
     record = { ...record, insertedBy: owner }

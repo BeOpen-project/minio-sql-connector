@@ -3,7 +3,7 @@ const common = require("../../utils/common.js")
 const Log = require('../../utils/logger.js')//.app(module);
 const { Logger } = Log
 const logger = new Logger("controller")
-
+const config = require('../../config')
 
 const queryMongo = async (req, res) => {
     logger.info(req.body, req.query)
@@ -66,8 +66,8 @@ module.exports = {
     getEntries: async (req, res) => {
         logger.info("values")
         let email = req.body.prefix.split("/")[0]
-        if (process.queryEngine.updateOwner && !process.queryEngine.updatedOwners[email]) {
-            service.updateOwner(req.headers.authorization, email) 
+        if (config.updateOwner == "later" && !process.queryEngine.updatedOwners[email]) {
+            service.updateOwner(req.headers.authorization, email)
         }
         try {
             res.send(await service.getEntries(req.body.prefix, req.body.bucketName, req.headers.visibility, req.query.key, req.query.value))
