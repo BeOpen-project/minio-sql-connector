@@ -11,6 +11,7 @@ const { Client } = require('pg');
 const config = require('../../config')
 const { minioConfig, postgreConfig, delays, queryAllowedExtensions } = config
 const minioWriter = require("../../utils/minioWriter")
+const axios = require('axios')
 const client = new Client(postgreConfig);
 client.connect();
 minioWriter.client = client
@@ -211,6 +212,40 @@ module.exports = {
         if (values.lenght > 500)
             return ["Too many suggestions. Type some characters in order to reduce them"]
         return values
+    },
+
+    async updateOwner(bearer,email) {
+        let sources = await Source.find({ name: { $regex: email, $options: 'i' } });
+        let sourcesDetails = (await axios.get(config.minioConfig.ownerInfoEndpoint + "/user/listFiles?email=" + email,
+            {
+                headers: {
+                    Authorization: bearer
+                }
+            })).data
+        for (let source of sources) {
+            let owner
+            let ownerEmail = sourcesDetails.find(obj => obj.objectPath == source.record.name)?.insertedBy
+            //logger.debug(sourcesDetails.find(obj => obj.objectPath == source.record.name))
+            if (ownerEmail){
+                source.record.insertedBy = ownerEmail
+                await Source.updateOne({ _id: source._id }, { $set: { "record.insertedBy": ownerEmail } })
+            }
+            else
+                try {
+                    owner = (await axios.get(config.minioConfig.ownerInfoEndpoint + "/createdBy?filePath=" + source.record.name + "&etag=" + source.record.etag,
+                        {
+                            headers: {
+                                Authorization: bearer
+                            }
+                        })).data
+                    source.record.insertedBy = owner
+                    await source.save()
+                }
+                catch (error) {
+                    logger.error(error.toString())
+                }
+        }
+        process.queryEngine.updatedOwners[email] = true
     },
 
     async getEntries(prefix, bucketName, visibility, searchKey, searchValue) {

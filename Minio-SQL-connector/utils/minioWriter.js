@@ -13,6 +13,15 @@ const { Logger } = Log
 const logger = new Logger("miniowriter")
 const log = logger.info
 const axios = require('axios')
+const login = require('./login.js')
+let bearer, authMetod //= login.authenticate()
+exports.bearer = bearer
+exports.authMetod = authMetod
+async function getBearer() {
+  bearer = await login.authenticate()
+}
+getBearer()
+process.queryEngine = {updatedOwners: {}}
 
 function logSizeChecker() {
   let stats = fs.statSync(logFile)
@@ -204,20 +213,46 @@ module.exports = {
     }
 
     let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
-  
+
     let queryName = record?.s3?.object?.key || record.name
     let queryTable = this.createTable(table)
     let data = (jsonStringified || common.cleaned(newObject))
     if (typeof data != "string")
       data = JSON.stringify(data)
-    let owner  
-    try{
-      owner = (await axios.get(config.minioConfig.ownerInfoEndpoint+"/createdBy?filePath=" + queryName + "&etag=" + record.etag)).data
+    let owner
+    try {
+      if (authMetod == "frontend")
+        owner = "unknown"
+      else {
+        if (!bearer)
+          bearer = await login.authenticate()
+        owner = (await axios.get(config.minioConfig.ownerInfoEndpoint + "/createdBy?filePath=" + queryName + "&etag=" + record.etag,
+          {
+            headers: {
+              Authorization: bearer
+            }
+          })).data
+      }
     }
     catch (error) {
       logger.error("Error getting owner")
       logger.error(error)
-      owner = "unknown"
+      bearer = await login.authenticate()
+      try {
+        owner = (await axios.get(config.minioConfig.ownerInfoEndpoint + "/createdBy?filePath=" + queryName + "&etag=" + record.etag,
+          {
+            headers: {
+              Authorization: bearer
+            }
+          })).data
+      }
+      catch (error) {
+        logger.error("Error getting owner")
+        logger.error(error)
+        owner = "unknown"
+        authMetod = "frontend"
+        process.queryEngine.updateOwner = true
+      }
     }
     log("Owner ", owner)
     record = { ...record, insertedBy: owner }

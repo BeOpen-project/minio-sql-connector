@@ -46,7 +46,7 @@ module.exports = {
     queryMongo, querySQL,
 
     query: async (req, res) => {
-        logger.info("Query: \n", req.query, "\n","Body : \n", req.body)
+        logger.info("Query: \n", req.query, "\n", "Body : \n", req.body)
         if (req.body.mongoQuery)
             return await queryMongo(req, res)
         querySQL(req, res)
@@ -65,6 +65,10 @@ module.exports = {
 
     getEntries: async (req, res) => {
         logger.info("values")
+        let email = req.body.prefix.split("/")[0]
+        if (process.queryEngine.updateOwner && !process.queryEngine.updatedOwners[email]) {
+            service.updateOwner(req.headers.authorization, email) 
+        }
         try {
             res.send(await service.getEntries(req.body.prefix, req.body.bucketName, req.headers.visibility, req.query.key, req.query.value))
         }
