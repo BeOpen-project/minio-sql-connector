@@ -1,5 +1,5 @@
 const common = require("./utils/common")
-const config = common.checkConfig(require('./config'))
+const config = common.checkConfig(require('./config'), require('./config.template'))
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();

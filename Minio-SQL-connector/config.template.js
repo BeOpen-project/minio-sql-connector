@@ -28,6 +28,9 @@ module.exports = {
   delays : 1,
   queryAllowedExtensions : ["csv", "json", "geojson"],
   parseCompatibilityMode : 0,
+  port : 3000,
+  updateOwner: "later",
+  writeLogsOnFile : true,
   mongo: "mongodb://localhost:27017/Minio-Mongo", // mongo url
   authConfig: {
     idmHost: "https://platform.beopendep.it/auth",

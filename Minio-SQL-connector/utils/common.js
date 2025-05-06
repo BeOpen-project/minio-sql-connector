@@ -271,18 +271,24 @@ module.exports = {
   },
   */
 
-  checkConfig(configIn) {
-
-    if (!configIn.queryAllowedExtensions) configIn.queryAllowedExtensions = ["csv", "json", "geojson"]
+  checkConfig(configIn, configTemplate) {
+    for (let key in configTemplate) {
+      if (typeof configIn[key] == "object") 
+        configIn[key] = this.checkConfig(configIn[key], configTemplate[key])
+      else if (configIn[key] == undefined) {
+        logger.warn(`Config key ${key} is missing, using default value`)
+        configIn[key] = configTemplate[key]
+      }
+    }
     return configIn
   },
 
   bodyCheck: async (req, res, next) => {
-    if(req?.body?.mongoQuery && req.body.mongoQuery[''] == '{"$gte":null,"$lte":null}')
+    if (req?.body?.mongoQuery && req.body.mongoQuery[''] == '{"$gte":null,"$lte":null}')
       delete req.body.mongoQuery['']
     if (!req.body.query && req?.body?.mongoQuery && !(Object.keys(req?.body?.mongoQuery).length == 1 && req.body.mongoQuery[''] == ''))
       //req.body ? req.body.mongoQuery = req.query : req.body = { mongoQuery: req.query }
-    objectCheck([req.body.mongoQuery, req.query])
+      objectCheck([req.body.mongoQuery, req.query])
     next()
   }
 }
