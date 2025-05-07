@@ -15,3 +15,4 @@ config.json
 Minio-SQL-connector/logs/
 Minio-SQL-connector/abs.yml
 Minio/
+Minio-SQL-connector/rejected/common.js
