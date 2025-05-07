@@ -1,6 +1,4 @@
-const Log = require('../../utils/logger')//.app(module);
-const { Logger } = Log
-const logger = new Logger("service")
+const logger = require('percocologger')
 const log = logger.info
 const Source = require('../models/source')
 const Value = require('../models/value')

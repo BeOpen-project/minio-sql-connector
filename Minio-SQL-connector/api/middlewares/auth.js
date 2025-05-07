@@ -7,9 +7,7 @@ const realm = authConfig.authRealm;
 const clientID = authConfig.clientId;
 const clientSecret = authConfig.secret;
 const {parseJwt} = require("../../utils/common")
-const Log = require('../../utils/logger')//.app(module);
-const { Logger } = Log
-const logger = new Logger("auth")
+const logger = require('percocologger')
 
 module.exports = {
     auth: async (req, res, next) => {

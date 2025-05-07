@@ -1,8 +1,5 @@
 const service = require("../services/service.js")
-const common = require("../../utils/common.js")
-const Log = require('../../utils/logger.js')//.app(module);
-const { Logger } = Log
-const logger = new Logger("controller")
+const logger = require('percocologger')
 const config = require('../../config')
 
 const queryMongo = async (req, res) => {

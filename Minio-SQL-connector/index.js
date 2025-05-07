@@ -3,14 +3,14 @@ const config = common.checkConfig(require('./config'), require('./config.templat
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
-const port = config.port || 3000;
+const port = config.port;
 const mongoose = require("mongoose");
 const cors = require('cors');
 const routes = require ("./api/routes/router")
-const Log = require('./utils/logger')//.app(module);
-const { Logger } = Log
-const logger = new Logger("service")
-logger.info(config.queryAllowedExtensions)
+const logger = require('percocologger')
+//const { Logger } = Log
+//const logger = new Logger("index");
+logger.info(config.queryAllowedExtensions);
 
 app.use(cors());
 app.use(express.urlencoded({ extended: false }));

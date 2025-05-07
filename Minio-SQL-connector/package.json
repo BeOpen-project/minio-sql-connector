@@ -25,9 +25,10 @@
     "minio": "^8.0.0",
     "mongoose": "^8.3.4",
     "nodemon": "^3.1.0",
+    "percocologger": "^1.0.6",
     "pg": "^8.11.5"
   },
-  "stashDependencies" : {
+  "stashDependencies": {
     "urlencode": "^2.0.0"
   }
 }

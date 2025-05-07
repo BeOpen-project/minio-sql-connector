@@ -1,7 +1,5 @@
 ﻿//const Papa = require("papaparse");
-const Log = require('./logger')//.app(module);
-const { Logger } = Log
-const logger = new Logger("miniowriter")
+const logger = require('percocologger')
 const log = logger.info
 
 function objectCheck(objs) {
