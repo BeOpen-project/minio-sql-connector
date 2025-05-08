@@ -1,10 +1,10 @@
-var Minio = require('minio')
+const Minio = require('minio')
 const common = require('./common.js')
 const { sleep, getEntries, setType } = common
 const config = require('../config.js')
 const { minioConfig, delays, queryAllowedExtensions } = config
 const Source = require('../api/models/source.js')//TODO divide collections by email and/or bucket
-let minioClient = new Minio.Client(minioConfig)
+const minioClient = new Minio.Client(minioConfig)
 const fs = require('fs');
 const logFile = 'log.txt';
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -12,36 +12,6 @@ const logger = require('percocologger')
 const log = logger.info
 const axios = require('axios')
 process.queryEngine = {updatedOwners: {}}
-
-function logSizeChecker() {
-  let stats = fs.statSync(logFile)
-  let fileSizeInBytes = stats.size;
-  let fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
-  logger.info("Log size is ", fileSizeInMegabytes)
-  if (fileSizeInMegabytes > 50)
-    fs.writeFile(logFile, "", err => {
-      if (err) {
-        logger.error(err);
-      } else {
-        logger.info("Log reset")
-      }
-    });
-}
-
-function log2(...m) {
-  logger.info(...m)
-  if (config.writeLogsOnFile) {
-    let args = [...m]
-    for (let arg of args)
-      if (arg && (Array.isArray(arg) || typeof arg == "object"))
-        logStream.write(JSON.stringify(arg) + '\n');
-      else
-        logStream.write(arg + '\n');
-  }
-}
-
-if (config.writeLogsOnFile)
-  setInterval(logSizeChecker, 3600000)
 
 module.exports = {
 
@@ -65,8 +35,8 @@ module.exports = {
     let resultMessage
     let errorMessage
 
-    var data = []
-    var stream = minioClient.listObjects(bucketName, '', true, { IncludeVersion: true })
+    let data = []
+    let stream = minioClient.listObjects(bucketName, '', true, { IncludeVersion: true })
     stream.on('data', function (obj) {
       data.push(obj)
     })

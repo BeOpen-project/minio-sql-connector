@@ -8,8 +8,6 @@ const mongoose = require("mongoose");
 const cors = require('cors');
 const routes = require ("./api/routes/router")
 const logger = require('percocologger')
-//const { Logger } = Log
-//const logger = new Logger("index");
 logger.info(config.queryAllowedExtensions);
 
 app.use(cors());
