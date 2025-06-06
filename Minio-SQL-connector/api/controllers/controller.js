@@ -40,7 +40,9 @@ const querySQL = async (req, res) => {
 
 module.exports = {
 
-    queryMongo, querySQL,
+    queryMongo, 
+
+    querySQL,
 
     query: async (req, res) => {
         logger.info("Query: \n", req.query, "\n", "Body : \n", req.body)
@@ -61,7 +63,7 @@ module.exports = {
     },
 
     getEntries: async (req, res) => {
-        logger.info("values")
+        logger.info("entries")
         let email = req.body.prefix.split("/")[0]
         if (config.updateOwner == "later" && !process.queryEngine.updatedOwners[email]) {
             service.updateOwner(req.headers.authorization, email)

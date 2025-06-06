@@ -6,8 +6,29 @@ const keycloakServerURL = authConfig.idmHost;
 const realm = authConfig.authRealm;
 const clientID = authConfig.clientId;
 const clientSecret = authConfig.secret;
-const {parseJwt} = require("../../utils/common")
+const { parseJwt } = require("../../utils/common")
 const logger = require('percocologger')
+
+function deniedQuery(query, bucketName, prefix) {
+    //if (req.params.bucketName && req.params.objectName)
+    //    logger.debug(req.body.bucketName , req.params.bucketName , req.body.prefix , req.params.objectName.split("/")[0] + "/" + req.params.objectName.split("/")[1])
+    let analyzedQuery
+    try {
+        if (query) {
+            analyzedQuery = query.split(" ").filter(str => str !== '').join(' ')
+            let requestedBucketname = analyzedQuery.split("FROM")[1].split(" ")[1]
+            if (requestedBucketname != bucketName)
+                return true
+            analyzedQuery = query.split("name = '")[1]
+            if (!analyzedQuery.startsWith(prefix))
+                return true
+        }
+    }
+    catch (error) {
+        logger.error(error)
+        return true
+    }
+}
 
 module.exports = {
     auth: async (req, res, next) => {
@@ -99,28 +120,13 @@ module.exports = {
                             config.group = decodedToken.email
                         }
 
-                        //if (req.params.bucketName && req.params.objectName)
-                        //    logger.debug(req.body.bucketName , req.params.bucketName , req.body.prefix , req.params.objectName.split("/")[0] + "/" + req.params.objectName.split("/")[1])
-                        let deniedQuery, query
-                        try {
-                            if (req.body.query) {
-                                query = req.body.query.split("FROM ")
-                                query = query[1].split(" ")
-                                if (query[0] != req.body.bucketName)
-                                    deniedQuery = true
-                                query = req.body.query.split("name = '")[1]
-                                if (!query.startsWith(req.body.prefix))
-                                    deniedQuery = true
-                            }
-                            //if (!deniedQuery)
-                            next()
-                            //else 
-                            //    res.status(403).send("Available bucketname is " + req.body.bucketName + " and you tried to access " + req.body.query.split("FROM ")[1].split(" ") + ".\nAvailable prefix is " + req.body.prefix + " and you tried to access this object " + req.body.query.split("name = '")[1].split("'"));
-                        }
-                        catch (error) {
-                            logger.error(error)
-                            next()
-                        }
+                        if (config.enableQueryControl)
+                            if (!deniedQuery(req.body.query, req.body.bucketName, req.body.prefix))
+                                next()
+                            else
+                                return res.status(403).send("Available bucketname is " + req.body.bucketName + " and you tried to access " + req.body.query.split("FROM ")[1].split(" ") + ".\nAvailable prefix is " + req.body.prefix + " and you tried to access this object " + req.body.query.split("name = '")[1].split("'"));
+                        else
+                            next();
                     }
                     else
                         return res.sendStatus(403);
