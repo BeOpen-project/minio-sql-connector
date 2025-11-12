@@ -3,6 +3,10 @@ const axios = require('axios');
 const logger = require('percocologger')
 const config = require('../config.js');
 
+function getEndpointVersionApi(subId) {
+    return (config.orion.apiVersion == "v2" || (subId && !subId.startsWith("urn:ngsi-ld:Subscription:")) ? "/v2/subscriptions" : "/ngsi-ld/v1/subscriptions")
+}
+
 async function createOrionSubscription({
     orionBaseUrl,
     notificationUrl,
@@ -11,25 +15,45 @@ async function createOrionSubscription({
 }) {
     if (await checkMultipleSubscriptions(notificationUrl) > 0)
         return logger.warn(message = "Already existing subscription found for the same notification URL.") || message;
-    const sub = {
-        description: `Query engine subscription`,
-        subject: {
-            entities: [{ idPattern: '.*' }],
-        },
+    const sub = config.orion.apiVersion == "v2" ?
+        {
+            description: `Query engine subscription`,
+            subject: {
+                entities: [{ idPattern: '.*' }],
+            },
 
-        notification: {
-            http: { url: notificationUrl },
-            "attrs": [],
-        },
-        throttling: 1
-    };
+            notification: {
+                http: { url: notificationUrl },
+                attrs: [],
+            },
+            throttling: 1
+        } :
+        {
+            type: "Subscription",
+            entities: [
+                {
+                    type: config.orion.subscribeType || "Thing"
+                }
+            ],
+            watchedAttributes: config.orion.watchedAttributes || [config.orion.attrWithUrl],
+            notification: {
+                endpoint: {
+                    uri: config.orion.notificationUrl,
+                    accept: "application/json"
+                }
+            },
+            throttling: 5,
+            expires: "2025-12-12T00:00:00Z"
+        }
 
     const headers = { 'Content-Type': 'application/json' };
     if (fiwareService) headers['Fiware-Service'] = fiwareService;
     if (fiwareServicePath) headers['Fiware-ServicePath'] = fiwareServicePath;
 
-    const url = `${orionBaseUrl.replace(/\/$/, '')}/v2/subscriptions`;
+    const url = `${orionBaseUrl.replace(/\/$/, '')}${getEndpointVersionApi()}`;
+    logger.info(url, sub, { headers })
     const res = await axios.post(url, sub, { headers });
+    logger.info({ status: res.status })
     return res.data;
 }
 
@@ -48,18 +72,31 @@ if (config.orion.subscribe)
     })
 
 async function getSubscriptions() {
-    return (await axios.get((config.orion.orionBaseUrl || 'http://localhost:1027') + '/v2/subscriptions', { headers: { 'Fiware-Service': 'service', 'Fiware-ServicePath': '/service' } })).data
+    return (await axios.get((config.orion.orionBaseUrl || 'http://localhost:1027') + getEndpointVersionApi(), { headers: { 'Fiware-Service': config.orion.fiwareService || 'service', 'Fiware-ServicePath': config.orion.fiwareServicePath || '/service' } })).data
 }
 
 async function deleteSubscription(subId) {
-    return (await axios.delete(`${(config.orion.orionBaseUrl || 'http://localhost:1027')}/v2/subscriptions/${subId}`, { headers: { 'Fiware-Service': 'service', 'Fiware-ServicePath': '/service' } })).data
+    return (await axios.delete(`${(config.orion.orionBaseUrl || 'http://localhost:1027')}${getEndpointVersionApi(subId)}/${subId}`, { headers: { 'Fiware-Service': config.orion.fiwareService || 'service', 'Fiware-ServicePath': config.orion.fiwareServicePath || '/service' } })).data
+}
+
+function typesCheck(subTypes) {
+    // subTypes?.[0]?.type == (config.orion.subscribeType || "Thing")
+    return subTypes.find(subType => subType.type === (config.orion.subscribeType || "Thing"))
+}
+
+function attributesCheck(subAttributes) {
+    const sortedActuallyWatchedAttributes = [...subAttributes].sort();
+    const sortedDesiredWatchedAttributes = [...config.orion.watchedAttributes].sort();
+
+    if (sortedActuallyWatchedAttributes.length !== sortedDesiredWatchedAttributes.length) return false;
+    return sortedActuallyWatchedAttributes.every((val, i) => val === sortedDesiredWatchedAttributes[i]);
 }
 
 async function checkMultipleSubscriptions(notificationUrl) {
     let subscriptions = await getSubscriptions()
     let count = 0
     for (let sub of subscriptions) {
-        if (config.orion.deleteAllDuplicateSubscriptions && sub.notification?.http?.url === notificationUrl) {
+        if (config.orion.deleteAllDuplicateSubscriptions && (sub.notification?.http?.url === notificationUrl || sub.notification?.endpoint?.uri === notificationUrl)) {
             if (count > 0) {
                 console.log(`Deleting duplicate subscription with id ${sub.id}`)
                 await deleteSubscription(sub.id)
@@ -67,7 +104,13 @@ async function checkMultipleSubscriptions(notificationUrl) {
             else
                 count++
         }
-        else if (sub.subject?.entities?.[0]?.idPattern === '.*' && sub.notification?.http?.url === notificationUrl && sub.description === `Query engine subscription`) {
+        else if (
+            (sub.subject?.entities?.[0]?.idPattern === '.*' || (typesCheck(sub.entities) && attributesCheck(sub.watchedAttributes)))
+            &&
+            (sub.notification?.http?.url === notificationUrl || sub.notification?.endpoint?.uri === notificationUrl)
+            &&
+            (!sub.description || sub.description === `Query engine subscription`)
+        ) {
             if (count > 0) {
                 console.log(`Deleting duplicate subscription with id ${sub.id}`)
                 await deleteSubscription(sub.id)

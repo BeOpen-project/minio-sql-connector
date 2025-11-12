@@ -186,6 +186,8 @@ module.exports = {
 
     notifyPath: async (req, res) => {
 
+        logger.info({body : JSON.stringify(req.body)})
+
         const data = req.body.data || req.body.value || req.body;
         const entities = Array.isArray(data) ? data : [data];
 
@@ -203,25 +205,51 @@ module.exports = {
             }
 
             if (!urlValue || typeof urlValue !== 'string') {
-                console.warn(`[notify] no URL found for entity ${id}`);
+                console.warn(`no URL found for entity ${id}`);
                 continue;
             }
-            const response = await axios.get(urlValue);
-            if (response.data.data.datapoints)
-                await Datapoints.insertMany(response.data.data.datapoints)
-            else
-                await minioWriter.insertInDBs(response.data, {
-                    name: id + '-' + path.basename((new URL(urlValue)).pathname),
-                    lastModified: new Date(),
-                    versionId: 'null',
-                    isDeleteMarker: false,
-                    bucketName: 'orion-notify',
-                    size: response.data.length,
-                    isLatest: true,
-                    etag: '',
-                    insertedBy: 'orion-notify'
-                });
-            logger.info(`[notify] downloaded ${urlValue}`);
+
+            let mapID = req.query.mapID || req.params.mapID || ent.mapID || config.mapID
+
+            if (!mapID) {
+                const response = await axios.get(urlValue);
+                if (response?.data?.data?.datapoints)
+                    await Datapoints.insertMany(response.data.data.datapoints)
+                else
+                    await minioWriter.insertInDBs(response.data, {
+                        name: id + '-' + path.basename((new URL(urlValue)).pathname),
+                        lastModified: new Date(),
+                        versionId: 'null',
+                        isDeleteMarker: false,
+                        bucketName: 'orion-notify',
+                        size: response.data.length,
+                        isLatest: true,
+                        etag: '',
+                        insertedBy: 'orion-notify'
+                    });
+            }
+            else {
+                let response = await axios.post(config.mapEndpoint, {
+                    mapID,
+                    sourceDataURL: urlValue
+                },
+                    { headers: { "Authorization": `Bearer ${bearerToken}` } });
+                logger.info(response.data)
+
+                for (let i in response.data)
+                    await minioWriter.insertInDBs(response.data[i], {
+                        name: response.data[i].id || mapID + '-' + path.basename((new URL(urlValue)).pathname) + i,
+                        lastModified: new Date(),
+                        versionId: 'null',
+                        isDeleteMarker: false,
+                        bucketName: 'orion-notify',
+                        size: response.data.length,
+                        isLatest: true,
+                        etag: '',
+                        insertedBy: 'orion-notify'
+                    });
+            }
+            logger.info(`downloaded ${urlValue}`);
         }
         return 'OK';
     },

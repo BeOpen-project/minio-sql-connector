@@ -23,6 +23,8 @@ module.exports = {
     password: '',
     port: 5432
   },
+  mapEndpoint: "http://localhost:5500/api/map/transform",
+  mapID: "",
   orion: {
     subscribe: true,
     deleteAllDuplicateSubscriptions: true,
