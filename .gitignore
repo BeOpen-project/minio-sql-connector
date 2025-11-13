@@ -27,3 +27,4 @@ docker-compose.yaml
 docker-compose.yml
 
 utils/percocologger
+token.js

@@ -47,6 +47,8 @@ module.exports = {
   authConfig: {
     idmHost: "https://platform.beopendep.it/auth",
     clientId: "",
+    username: "",
+    password: "",
     userInfoEndpoint: "https://platform.beopendep.it/api/user",
     disableAuth: false,
     authProfile: "oidc",

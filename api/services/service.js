@@ -15,6 +15,12 @@ const client = new Client(postgreConfig);
 client.connect();
 minioWriter.client = client
 let syncing
+const { updateJWT } = require('../../utils/keycloak')
+let bearerToken
+updateJWT().then(token => {
+    bearerToken = token
+    logger.info("Initial Keycloak token obtained")
+}).catch(error => logger.error(error.response?.data || error));
 
 const fs = require('fs');
 const path = require('path');
@@ -186,7 +192,7 @@ module.exports = {
 
     notifyPath: async (req, res) => {
 
-        logger.info({body : JSON.stringify(req.body)})
+        logger.info({ body: JSON.stringify(req.body) })
 
         const data = req.body.data || req.body.value || req.body;
         const entities = Array.isArray(data) ? data : [data];
@@ -229,11 +235,36 @@ module.exports = {
                     });
             }
             else {
-                let response = await axios.post(config.mapEndpoint, {
-                    mapID,
-                    sourceDataURL: urlValue
-                },
-                    { headers: { "Authorization": `Bearer ${bearerToken}` } });
+                let response
+                try {
+                    response = await axios.post(
+                        config.mapEndpoint,
+                        {
+                            mapID,
+                            sourceDataURL: urlValue
+                        },
+                        {
+                            headers: {
+                                "Authorization": `Bearer ${bearerToken}`
+                            }
+                        });
+                }
+                catch (error) {
+                    logger.error("Error fetching mapped data from API Connector:", error.response?.data || error.message);
+
+                    bearerToken = await updateJWT();
+                    response = await axios.post(
+                        config.mapEndpoint,
+                        {
+                            mapID,
+                            sourceDataURL: urlValue
+                        },
+                        {
+                            headers: {
+                                "Authorization": `Bearer ${bearerToken}`
+                            }
+                        });
+                }
                 logger.info(response.data)
 
                 for (let i in response.data)
