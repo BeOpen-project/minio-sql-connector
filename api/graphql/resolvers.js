@@ -1,6 +1,7 @@
 const Source = require('../models/Source')
 const Datapoint = require('../models/Datapoint')
 const util = require('util')
+const { translateDataPointsBatch } = require('../services/translationService')
 
 const resolvers = {
   Query: {
@@ -10,7 +11,7 @@ const resolvers = {
     source: async (parent, { id }) => {
       return await Source.findById(id)
     },
-
+/*
     datapoints: async (_parent, args, { db }) => {
       const {
         survey,
@@ -227,29 +228,36 @@ const resolvers = {
       const datapoints = await Datapoint.aggregate(pipeline).exec()
       return datapoints
     },
-
-    datapointsV3: async (_parent, args, { db }) => {
+*/
+    datapoints: async (_parent, args, { db }) => {
+      // Estrai tutti gli argomenti di "controllo" che hanno una logica speciale.
       const {
-        survey,
-        source,
-        region,
         sortBy = [],
         sortOrder = 'ASC',
         dimensions = [],
         exclude = [],
         filterBy,
         filter = [],
-        limit
+        limit,
+        lang,
+        // in un unico oggetto. 'otherFilters' conterrà { survey: '..', region: '..', ecc. }
+        ...otherFilters
       } = args
 
-      // Cache per le chiavi delle dimensioni (potrebbe essere spostata fuori dalla funzione)
+      const query = { ...otherFilters } // query ora è { survey: '...', region: '...', altro: '...' }
+
+      if (!query.survey) {
+        throw new Error(
+          'Il parametro "survey" è obbligatorio per questa query.'
+        )
+      }
+
       let dimensionKeysCache = null
 
-      // Funzione helper per estrarre chiavi dimensioni
       const getDimensionKeys = async () => {
         if (dimensionKeysCache) return dimensionKeysCache
 
-        const sampleDatapoints = await Datapoint.find({ survey })
+        const sampleDatapoints = await Datapoint.find({ survey: query.survey })
           .limit(50)
           .select('dimensions')
           .lean()
@@ -264,18 +272,12 @@ const resolvers = {
             )
           )
         ]
-
         return dimensionKeysCache
       }
 
       // Costruzione query MongoDB
-      const query = { survey }
       const andClauses = []
 
-      if (source) query.source = source
-      if (region) query.region = region
-
-      // Ottieni le chiavi dimensioni
       const dimensionKeys = await getDimensionKeys()
 
       // Filtro inclusione dimensioni
@@ -308,7 +310,7 @@ const resolvers = {
 
       // Filtro per dimensione specifica (filterBy index)
       if (typeof filterBy === 'number' && filter.length > 0) {
-        const sampleDoc = await Datapoint.findOne({ survey })
+        const sampleDoc = await Datapoint.findOne({ survey: query.survey })
           .select('dimensions')
           .lean()
           .exec()
@@ -337,11 +339,12 @@ const resolvers = {
       // Pipeline di aggregazione
       const pipeline = [
         { $match: query },
+
         {
           $lookup: {
-            from: 'sources', 
+            from: 'sources',
             localField: 'source',
-            foreignField: '_id',
+            foreignField: 'id',
             as: 'sourceData'
           }
         },
@@ -405,35 +408,37 @@ const resolvers = {
       pipeline.push({
         $project: {
           _id: 1,
-          region: 1,
           source: 1,
-          timestamp: 1,
           survey: 1,
-          value: 1,
-          sourceId: '$sourceData._id',
-          name: '$sourceData.name',
-          record: '$sourceData.record',
+          surveyName: 1,
+          surveyData: 1,
+          region: 1,
           dimensions: {
             $map: {
-              input: '$dimensions',
-              as: 'd',
-              in: {
-                $first: {
-                  $map: {
-                    input: { $objectToArray: '$$d' },
-                    as: 'pair',
-                    in: '$$pair.v'
-                  }
-                }
-              }
+              input: { $objectToArray: { $mergeObjects: '$dimensions' } },
+              as: 'dim',
+              in: '$$dim.v'
             }
-          }
+          },
+          aggregationPeriod: 1,
+          value: 1,
+          timestamp: 1,
+          smartKeys: 1,
+          references: 1,
+          fromUrl: 1,
+          meta: 1,
+          updateFrequency: 1
         }
       })
 
-      console.log('MongoDB Query:', JSON.stringify(pipeline, null, 2))
+      console.log('MongoDB Query Dinamica:', JSON.stringify(pipeline, null, 2))
 
       const datapoints = await Datapoint.aggregate(pipeline).exec()
+
+      if (lang && lang !== 'en') {
+        return await translateDataPointsBatch(datapoints, lang)
+      }
+
       return datapoints
     }
   },
