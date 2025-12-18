@@ -236,38 +236,72 @@ module.exports = {
             }
             else {
                 let response
-                try {
-                    response = await axios.post(
-                        config.mapEndpoint,
+                let retry = 2
+                while (retry > 0)
+                    try {
+                        response = await axios.post(
+                            config.mapEndpoint,
+                            {
+                                "sourceDataType": "json",
+                                "sourceDataURL": urlValue,
+                                "decodeOptions": {
+                                    "decodeFrom": "json-stat"
+                                },
+                                "config": {
+                                    "NGSI_entity": false,
+                                    "ignoreValidation": true,
+                                    "writers": [],
+                                    "disableAjv": true,
+                                    "mappingReport": true
+                                },
+                                "dataModel": {
+                                    "$schema": "http://json-schema.org/schema#",
+                                    "$id": "dataModels/DataModelTemp.json",
+                                    "title": "DataModelTemp",
+                                    "description": "Bike Hire Docking Station",
+                                    "type": "object",
+                                    "properties": {
+                                        "region": {
+                                            "type": "string"
+                                        },
+                                        "source": {
+                                            "type": "string"
+                                        },
+                                        "timestamp": {
+                                            "type": "string"
+                                        },
+                                        "survey": {
+                                            "type": "string"
+                                        },
+                                        "dimensions": {
+                                            "type": "object"
+                                        },
+                                        "value": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }/*
                         {
-                            mapID,
+                            //mapID,
                             sourceDataURL: urlValue
-                        },
-                        {
-                            headers: {
-                                "Authorization": `Bearer ${bearerToken}`
-                            }
-                        });
-                }
-                catch (error) {
-                    logger.error("Error fetching mapped data from API Connector:", error.response?.data || error.message);
+                        }*/,
+                            {
+                                headers: {
+                                    "Authorization": `Bearer ${bearerToken}`
+                                }
+                            });
+                        retry -= 2
+                    }
+                    catch (error) {
+                        logger.error("Error fetching mapped data from API Connector:", error.response?.data || error.message);
+                        bearerToken = await updateJWT();
+                        retry--
+                    }
+                logger.info(response.data.lenght)
 
-                    bearerToken = await updateJWT();
-                    response = await axios.post(
-                        config.mapEndpoint,
-                        {
-                            mapID,
-                            sourceDataURL: urlValue
-                        },
-                        {
-                            headers: {
-                                "Authorization": `Bearer ${bearerToken}`
-                            }
-                        });
-                }
-                logger.info(response.data)
-
-                for (let i in response.data)
+                await Datapoints.insertMany(response.data) //TODO check if datapoints or other data and generalize insertion
+                /*for (let i in response.data)
                     await minioWriter.insertInDBs(response.data[i], {
                         name: response.data[i].id || mapID + '-' + path.basename((new URL(urlValue)).pathname) + i,
                         lastModified: new Date(),
@@ -278,7 +312,7 @@ module.exports = {
                         isLatest: true,
                         etag: '',
                         insertedBy: 'orion-notify'
-                    });
+                    });*/
             }
             logger.info(`downloaded ${urlValue}`);
         }

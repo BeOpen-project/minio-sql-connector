@@ -258,7 +258,7 @@ const resolvers = {
         if (dimensionKeysCache) return dimensionKeysCache
 
         const sampleDatapoints = await Datapoint.find({ survey: query.survey })
-          .limit(50)
+          //.limit(50)
           .select('dimensions')
           .lean()
           .exec()
@@ -433,7 +433,9 @@ const resolvers = {
 
       console.log('MongoDB Query Dinamica:', JSON.stringify(pipeline, null, 2))
 
+      console.log('Esecuzione query...')
       const datapoints = await Datapoint.aggregate(pipeline).exec()
+      console.log(`Trovati datapoints.`)
 
       if (lang && lang !== 'en') {
         return await translateDataPointsBatch(datapoints, lang)

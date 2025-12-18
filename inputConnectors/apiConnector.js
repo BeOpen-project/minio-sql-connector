@@ -43,7 +43,7 @@ async function createOrionSubscription({
                 }
             },
             throttling: 5,
-            expires: "2025-12-12T00:00:00Z"
+            expires: new Date(new Date().getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         }
 
     const headers = { 'Content-Type': 'application/json' };
@@ -94,9 +94,12 @@ function attributesCheck(subAttributes) {
 
 async function checkMultipleSubscriptions(notificationUrl) {
     let subscriptions = await getSubscriptions()
+    console.log(JSON.stringify(subscriptions, null, 2))
     let count = 0
     for (let sub of subscriptions) {
-        if (config.orion.deleteAllDuplicateSubscriptions && (sub.notification?.http?.url === notificationUrl || sub.notification?.endpoint?.uri === notificationUrl)) {
+        if (config.orion.purgeSubscriptionsAtStart)
+            await deleteSubscription(sub.id)
+        else if (config.orion.deleteAllDuplicateSubscriptions && (sub.notification?.http?.url === notificationUrl || sub.notification?.endpoint?.uri === notificationUrl)) {
             if (count > 0) {
                 console.log(`Deleting duplicate subscription with id ${sub.id}`)
                 await deleteSubscription(sub.id)
