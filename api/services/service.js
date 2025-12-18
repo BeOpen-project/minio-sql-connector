@@ -295,12 +295,12 @@ module.exports = {
                     }
                     catch (error) {
                         logger.error("Error fetching mapped data from API Connector:", error.response?.data || error.message);
-                        bearerToken = await updateJWT();
+                        bearerToken = await updateJWT(true);
                         retry--
                     }
-                logger.info(response.data.lenght)
+                //logger.info(response.data.lenght)
 
-                await Datapoints.insertMany(response.data) //TODO check if datapoints or other data and generalize insertion
+                await Datapoints.insertMany(response.data)//.map(d => {return {...d, dimensions : {...(d.dimensions), year : d.dimensions.time}}})) //TODO check if datapoints or other data and generalize insertion
                 /*for (let i in response.data)
                     await minioWriter.insertInDBs(response.data[i], {
                         name: response.data[i].id || mapID + '-' + path.basename((new URL(urlValue)).pathname) + i,

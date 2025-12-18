@@ -6,14 +6,16 @@ const fs = require('fs');
 const path = './token.js';
 let token
 
-async function updateJWT() {
+async function updateJWT(update) {
 
-    try {
-        token = require("." + path);
-        return token;
-    } catch (error) {
-        console.error("Error loading token:", error);
-    }
+    if (!update)
+        try {
+            token = require("." + path);
+            return token;
+        } catch (error) {
+            console.error("Error loading token:", error);
+        }
+    console.log("Update token")
     const response = await axios.post(
         `${keycloakBaseUrl}/protocol/openid-connect/token`,
         new URLSearchParams({

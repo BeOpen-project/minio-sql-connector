@@ -1,5 +1,5 @@
 query FetchTotalPopulationChange($pilot_nuts3: String!) {
-  datapointsV2(
+  datapoints(
     survey: "demo_r_gind3"
     sortBy: "year"
     sortOrder: "asc"

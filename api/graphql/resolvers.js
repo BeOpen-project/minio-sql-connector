@@ -11,7 +11,7 @@ const resolvers = {
     source: async (parent, { id }) => {
       return await Source.findById(id)
     },
-/*
+    /*
     datapoints: async (_parent, args, { db }) => {
       const {
         survey,
@@ -240,11 +240,10 @@ const resolvers = {
         filter = [],
         limit,
         lang,
-        // in un unico oggetto. 'otherFilters' conterrà { survey: '..', region: '..', ecc. }
         ...otherFilters
       } = args
 
-      const query = { ...otherFilters } // query ora è { survey: '...', region: '...', altro: '...' }
+      const query = { ...otherFilters }
 
       if (!query.survey) {
         throw new Error(
@@ -258,18 +257,21 @@ const resolvers = {
         if (dimensionKeysCache) return dimensionKeysCache
 
         const sampleDatapoints = await Datapoint.find({ survey: query.survey })
-          //.limit(50)
           .select('dimensions')
           .lean()
           .exec()
 
         dimensionKeysCache = [
           ...new Set(
-            sampleDatapoints.flatMap(doc =>
-              Array.isArray(doc.dimensions)
-                ? doc.dimensions.flatMap(d => Object.keys(d))
-                : []
-            )
+            sampleDatapoints.flatMap(doc => {
+              // Supporta sia array che oggetto singolo
+              if (Array.isArray(doc.dimensions)) {
+                return doc.dimensions.flatMap(d => Object.keys(d))
+              } else if (doc.dimensions && typeof doc.dimensions === 'object') {
+                return Object.keys(doc.dimensions)
+              }
+              return []
+            })
           )
         ]
         return dimensionKeysCache
@@ -283,20 +285,31 @@ const resolvers = {
       // Filtro inclusione dimensioni
       if (dimensions.length > 0 && dimensionKeys.length > 0) {
         dimensions.forEach(value => {
-          andClauses.push({
+          // Costruisci condizioni per entrambi i formati
+          const arrayCondition = {
             dimensions: {
               $elemMatch: {
                 $or: dimensionKeys.map(k => ({ [k]: value }))
               }
             }
+          }
+
+          const objectCondition = {
+            $or: dimensionKeys.map(k => ({ [`dimensions.${k}`]: value }))
+          }
+
+          andClauses.push({
+            $or: [arrayCondition, objectCondition]
           })
         })
       }
 
       // Filtro esclusione dimensioni
+      /*
       if (exclude.length > 0 && dimensionKeys.length > 0) {
         exclude.forEach(value => {
-          andClauses.push({
+          // Condizione per array format
+          const arrayCondition = {
             dimensions: {
               $not: {
                 $elemMatch: {
@@ -304,9 +317,21 @@ const resolvers = {
                 }
               }
             }
+          }
+
+          // Condizione per object format
+          const objectCondition = {
+            $and: dimensionKeys.map(k => ({
+              [`dimensions.${k}`]: { $ne: value }
+            }))
+          }
+
+          andClauses.push({
+            $or: [arrayCondition, objectCondition]
           })
         })
       }
+        */
 
       // Filtro per dimensione specifica (filterBy index)
       if (typeof filterBy === 'number' && filter.length > 0) {
@@ -315,21 +340,43 @@ const resolvers = {
           .lean()
           .exec()
 
-        const dimensionObj = sampleDoc?.dimensions?.[filterBy]
+        let dimensionKey = null
 
-        if (dimensionObj) {
-          const [dimensionKey] = Object.keys(dimensionObj)
+        // Gestisci sia array che oggetto
+        if (Array.isArray(sampleDoc?.dimensions)) {
+          const dimensionObj = sampleDoc.dimensions[filterBy]
+          if (dimensionObj) {
+            dimensionKey = Object.keys(dimensionObj)[0]
+          }
+        } else if (
+          sampleDoc?.dimensions &&
+          typeof sampleDoc.dimensions === 'object'
+        ) {
+          // Per oggetto singolo, usa filterBy come indice delle chiavi
+          const keys = Object.keys(sampleDoc.dimensions)
+          dimensionKey = keys[filterBy]
+        }
+
+        if (dimensionKey) {
           const filterValues = filter.map(v => {
             const num = Number(v)
             return isNaN(num) ? v : num
           })
 
+          // Supporta entrambi i formati
           andClauses.push({
-            dimensions: {
-              $elemMatch: {
-                [dimensionKey]: { $in: filterValues }
+            $or: [
+              {
+                dimensions: {
+                  $elemMatch: {
+                    [dimensionKey]: { $in: filterValues }
+                  }
+                }
+              },
+              {
+                [`dimensions.${dimensionKey}`]: { $in: filterValues }
               }
-            }
+            ]
           })
         }
       }
@@ -356,6 +403,34 @@ const resolvers = {
         }
       ]
 
+      // --- LOGICA EXCLUDE ---
+      if (exclude.length > 0) {
+        pipeline.push(
+          {
+            $addFields: {
+              _tempValuesToCheck: {
+                $map: {
+                  // mergeObjects unifica sia se 'dimensions' è un array di oggetti, sia se è un oggetto singolo
+                  input: { $objectToArray: { $mergeObjects: '$dimensions' } },
+                  as: 'dim',
+                  in: '$$dim.v' 
+                }
+              }
+            }
+          },
+          {
+            $match: {
+              _tempValuesToCheck: {
+                $nin: exclude // $nin esclude il documento se UNO QUALSIASI dei valori combacia
+              }
+            }
+          },
+          {
+            $unset: '_tempValuesToCheck'
+          }
+        )
+      }
+
       // Ordinamento
       if (sortBy.length > 0) {
         const sortByArray = Array.isArray(sortBy) ? sortBy : [sortBy]
@@ -368,23 +443,31 @@ const resolvers = {
 
         sortByArray.forEach((field, i) => {
           const order = sortOrderArray[i]?.toUpperCase() === 'DESC' ? -1 : 1
+          console.log(sortOrderArray[i])
 
           if (dimensionKeys.includes(field)) {
+            // Gestisci ordinamento per entrambi i formati
             addFieldsStage[`sort_${field}`] = {
-              $first: {
-                $map: {
-                  input: {
-                    $filter: {
-                      input: '$dimensions',
+              $cond: {
+                if: { $isArray: '$dimensions' },
+                then: {
+                  $first: {
+                    $map: {
+                      input: {
+                        $filter: {
+                          input: '$dimensions',
+                          as: 'dim',
+                          cond: {
+                            $gt: [{ $type: `$$dim.${field}` }, 'missing']
+                          }
+                        }
+                      },
                       as: 'dim',
-                      cond: {
-                        $gt: [{ $type: `$$dim.${field}` }, 'missing']
-                      }
+                      in: `$$dim.${field}`
                     }
-                  },
-                  as: 'dim',
-                  in: `$$dim.${field}`
-                }
+                  }
+                },
+                else: `$dimensions.${field}`
               }
             }
             sortStage[`sort_${field}`] = order
@@ -414,10 +497,22 @@ const resolvers = {
           surveyData: 1,
           region: 1,
           dimensions: {
-            $map: {
-              input: { $objectToArray: { $mergeObjects: '$dimensions' } },
-              as: 'dim',
-              in: '$$dim.v'
+            $cond: {
+              if: { $isArray: '$dimensions' },
+              then: {
+                $map: {
+                  input: { $objectToArray: { $mergeObjects: '$dimensions' } },
+                  as: 'dim',
+                  in: '$$dim.v'
+                }
+              },
+              else: {
+                $map: {
+                  input: { $objectToArray: '$dimensions' },
+                  as: 'dim',
+                  in: '$$dim.v'
+                }
+              }
             }
           },
           aggregationPeriod: 1,

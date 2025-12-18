@@ -1,6 +1,6 @@
 
 query FetchPopulationBySexAge($pilot_nuts3: String!) {
-  datapointsV2(
+  datapoints(
     survey: "demo_r_pjangrp3"
     dimensions: [$pilot_nuts3]
     exclude: ["undefined", "Unknown", "Total"]

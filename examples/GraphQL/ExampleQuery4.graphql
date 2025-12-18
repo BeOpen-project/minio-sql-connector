@@ -1,5 +1,5 @@
 query FetchPopulationBySexTotal($pilot_nuts3: String!) {
-  datapointsV2(
+  datapoints(
     survey: "demo_r_pjangrp3"
     sortBy: "year"
     sortOrder: "desc"
