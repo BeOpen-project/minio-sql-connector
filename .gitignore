@@ -28,3 +28,4 @@ docker-compose.yml
 
 utils/percocologger
 token.js
+*.sandbox.js

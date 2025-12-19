@@ -46,7 +46,7 @@ module.exports = {
             req.body.query = req.body.query.replace("SELECT * FROM public-data", "SELECT * FROM publicdata")
 
         if (authConfig.disableAuth) {
-            req.body.bucketName = config.minioConfig.defaultBucket || "default"
+            req.body.bucketName = config.minioConfig.defaultBucket || "defaultbucket"
             req.body.prefix = config.group = config.minioConfig.defaultInputFolderName
             next()
         }
@@ -120,12 +120,12 @@ module.exports = {
                             catch (error) {
                                 logger.error(error?.toString())
                                 logger.error(error?.response?.data || error?.response)
-                                req.body.bucketName = config.minioConfig.defaultBucket || "default"
+                                req.body.bucketName = config.minioConfig.defaultBucket || "defaultbucket"
                                 req.body.prefix = decodedToken.email
                                 config.group = decodedToken.email
                             }
                         else {
-                            req.body.bucketName = config.minioConfig.defaultBucket || "default"
+                            req.body.bucketName = config.minioConfig.defaultBucket || "defaultbucket"
                             req.body.prefix = decodedToken.email
                             config.group = decodedToken.email
                         }

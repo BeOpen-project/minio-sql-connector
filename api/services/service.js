@@ -5,16 +5,10 @@ const Value = require('../models/Value')
 const Key = require('../models/Key')
 const Entries = require('../models/Entries')
 const Datapoints = require("../models/Datapoint")
-const { sleep, json2csv } = require('../../utils/common')
-const { Client } = require('pg');
+const { json2csv } = require('../../utils/common')
 const config = require('../../config')
-const { minioConfig, postgreConfig, delays, queryAllowedExtensions } = config
-const minioWriter = require("../../utils/minioWriter")
+const minioWriter = require("../../inputConnectors/minioConnector")
 const axios = require('axios')
-const client = new Client(postgreConfig);
-client.connect();
-minioWriter.client = client
-let syncing
 const { updateJWT } = require('../../utils/keycloak')
 let bearerToken
 updateJWT().then(token => {
@@ -22,156 +16,10 @@ updateJWT().then(token => {
     logger.info("Initial Keycloak token obtained")
 }).catch(error => logger.error(error.response?.data || error));
 
-const fs = require('fs');
 const path = require('path');
 let attrWithUrl = config.orion?.attrWithUrl || "datasetUrl"
-const apiConnector = require('../../inputConnectors/apiConnector')
-
-if (minioConfig.subscribe.all)
-    minioWriter.listBuckets().then((buckets) => {
-        let a = 1
-        for (let bucket of buckets) {
-            minioWriter.getNotifications(bucket.name.toString())
-            logger.debug("Subscribed bucket " + (a++) + " of " + buckets.length, "(", bucket.name, ")")
-        }
-    })
-else
-    for (let bucket of minioConfig.subscribe.buckets)
-        minioWriter.getNotifications(bucket)
-
-async function sync() {
-    try {
-        if (!syncing) {
-            syncing = true
-            await Source.deleteMany({})
-            await Key.deleteMany({})
-            await Value.deleteMany({})
-            await Entries.deleteMany({})
-            let objects = []
-            let buckets = await minioWriter.listBuckets()
-            let bucketIndex = 1
-            for (let bucket of buckets) {
-                let bucketObjects = await minioWriter.listObjects(bucket.name)
-                let index = 1
-                for (let obj of bucketObjects) {
-                    try {
-                        logger.debug("Bucket ", bucketIndex, " of ", buckets.length)
-                        logger.debug("Scanning object ", index++, " of ", bucketObjects.length, ",", obj.name)
-                        let extension = obj.name.split(".").pop()
-                        let isAllowed = (queryAllowedExtensions == "all" || queryAllowedExtensions.includes(extension))
-                        if (obj.size && obj.isLatest && isAllowed) {
-                            let objectGot = await minioWriter.getObject(bucket.name, obj.name, obj.name.split(".").pop())
-                            objects.push({ raw: objectGot, info: { ...obj, bucketName: bucket.name } })
-                        }
-                        else logger.info("Size is ", obj.size, ", ", (obj.isLatest ? "is latest" : "is not latest"), " and extension ", (isAllowed ? "is allowed" : "is not allowed"))
-                    }
-                    catch (error) {
-                        logger.error(error)
-                    }
-                }
-                logger.debug("Bucket ", bucketIndex++, " of ", buckets.length, " scanning done")
-            }
-
-            minioWriter.entities.values = []
-            minioWriter.entities.keys = []
-            minioWriter.entities.entries = []
-            minioWriter.entities.uniqueValues = []
-            minioWriter.entities.uniqueKeys = []
-            minioWriter.entities.uniqueEntries = []
-
-            for (let obj of objects)
-                try {
-                    await minioWriter.insertInDBs(obj.raw, obj.info, true)
-                }
-                catch (error) {
-                    logger.error(error)
-                }
-
-            let entries = Object.entries(minioWriter.entries).map(([key, value]) => ({ [key]: value }));
-            let entriesInDB = []
-            for (let key in minioWriter.entries)
-                for (let value in minioWriter.entries[key])
-                    entriesInDB.push({
-                        key,
-                        value,
-                        visibility: minioWriter.entries[key][value]
-                    })
-            try {
-                if (entriesInDB.length > 0) await Entries.insertMany(entriesInDB);
-            } catch (error) {
-                if (!error?.errorResponse?.message?.includes("Document can't have")) {
-                    log(error);
-                } else {
-                    try {
-                        entries = entries.map(entry => {
-                            let fixedEntry = {};
-
-                            for (let key in entry) {
-                                let nestedObject = entry[key];
-
-                                if (typeof nestedObject === 'object' && nestedObject !== null) {
-                                    let sanitizedNestedObject = {};
-                                    for (let nestedKey in nestedObject) {
-                                        let sanitizedNestedKey = nestedKey.replace(/\$/g, ''); // Rimuove i `$` dalle chiavi
-                                        sanitizedNestedObject[sanitizedNestedKey] = nestedObject[nestedKey]; // Mantiene gli array di valori
-                                    }
-                                    fixedEntry[key] = sanitizedNestedObject;
-                                } else {
-                                    fixedEntry[key] = nestedObject;
-                                }
-                            }
-
-                            return fixedEntry;
-                        });
-
-                        await Entries.insertMany(entries);
-                    } catch (error) {
-                        log("There are problems inserting objects in MongoDB");
-                        log(error);
-                    }
-                }
-            }
-
-            let valuesToDB = []
-
-            for (let entry of entries)
-                for (let key in entry)
-                    for (let subKeyAliasValue in entry[key]) {
-                        let existingEntry = valuesToDB.find(v => v.value === subKeyAliasValue)
-                        if (existingEntry)
-                            existingEntry.visibility = [...new Set([...existingEntry.visibility, ...entry[key][subKeyAliasValue]])]
-                        else
-                            valuesToDB.push({ value: subKeyAliasValue, visibility: entry[key][subKeyAliasValue] })
-                    }
-
-            let keysToDB = entries.map(obj => ({
-                key: Object.keys(obj).pop() || "flag_error_key_missing",
-                visibility: obj[Object.keys(obj).pop()][Object.keys(obj[Object.keys(obj).pop()]).pop()],
-
-            })
-            )
-            await Key.insertMany(keysToDB)
-            await Value.insertMany(valuesToDB)
-
-            syncing = false
-            logger.info("Syncing finished")
-            console.info("Syncing finished")
-            return "Sync finished"
-        }
-        else {
-            logger.info("Syncing not finished")
-            return "Syncing"
-        }
-    }
-    catch (error) {
-        logger.error(error)
-    }
-}
-
-if (!config.doNotSyncAtStart)
-    sync()
-if (config.syncInterval)
-    setInterval(sync, config.syncInterval);
+require('../../inputConnectors/apiConnector')
+//const apiConnector = require('../../inputConnectors/apiConnector')
 
 function bucketIs(record, bucket) {
     return (record?.s3?.bucket?.name == bucket || record?.bucketName == bucket)
@@ -413,7 +261,7 @@ module.exports = {
         })
     },
 
-    sync: sync,
+    sync: minioWriter.sync,
 
     async minioListObjects(bucketName) {
         return await minioWriter.listObjects(bucketName)
