@@ -148,7 +148,19 @@ module.exports = {
                     }
                 //logger.info(response.data.lenght)
 
-                await Datapoints.insertMany(response.data)//.map(d => {return {...d, dimensions : {...(d.dimensions), year : d.dimensions.time}}})) //TODO check if datapoints or other data and generalize insertion
+                try {
+                    await Datapoints.insertMany(response.data)//.map(d => {return {...d, dimensions : {...(d.dimensions), year : d.dimensions.time}}})) //TODO check if datapoints or other data and generalize insertion
+                }
+                catch (error) {
+                    logger.error("Error inserting datapoints:", error.toString())
+                    for (let insertingObject of response.data)
+                        try {
+                            Datapoints.insertMany([insertingObject])
+                        }
+                        catch (innerError) {
+                            logger.error("Error inserting datapoint:", innerError.toString())
+                        }
+                }
                 /*for (let i in response.data)
                     await minioWriter.insertInDBs(response.data[i], {
                         name: response.data[i].id || mapID + '-' + path.basename((new URL(urlValue)).pathname) + i,

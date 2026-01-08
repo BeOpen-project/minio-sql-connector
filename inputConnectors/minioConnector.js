@@ -2,43 +2,19 @@ const Minio = require('minio')
 const common = require('../utils/common.js')
 const { sleep, getEntries, setType } = common
 const config = require('../config.js')
-const { minioConfig, delays, queryAllowedExtensions, postgreConfig, } = config
+const { minioConfig, delays, queryAllowedExtensions } = config
 const Source = require('../api/models/Source.js')//TODO divide collections by email and/or bucket
 const Key = require('../api/models/Key')
 const Values = require('../api/models/Value')
 const Entries = require('../api/models/Entries')
 const minioClient = new Minio.Client(minioConfig)
-const fs = require('fs');
-const logFile = 'log.txt';
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 const logger = require('percocologger')
 const log = logger.info
-//const axios = require('axios')
 process.queryEngine = { updatedOwners: {} }
-const { Client } = require('pg');
-const client = new Client(postgreConfig);
-client.connect();
-
+const client = require("./postgresConnector");
 const axios = require('axios')
-
-//minioWriter.
-if (minioConfig.subscribe.all)
-  listBuckets().then((buckets) => {
-    let a = 1
-    for (let bucket of buckets) {
-      getNotifications(bucket.name.toString())
-      logger.debug("Subscribed bucket " + (a++) + " of " + buckets.length, "(", bucket.name, ")")
-    }
-  })
-else
-  for (let bucket of minioConfig.subscribe.buckets)
-    getNotifications(bucket)
-
 let syncing
-let entries_gl = {
-
-}
-
+let entries_gl = {}
 let entities = {
   values: [],
   uniqueValues: [],
@@ -47,7 +23,9 @@ let entities = {
   keys: [],
   uniqueKeys: []
 }
+
 async function sync() {
+  
   try {
     if (!syncing) {
       syncing = true
@@ -176,7 +154,6 @@ async function sync() {
   }
 }
 
-
 async function listBuckets() {
   return await minioClient.listBuckets()
 }
@@ -220,12 +197,6 @@ function getNotifications(bucketName) {
     log(error)
   })
 }
-
-
-if (!config.doNotSyncAtStart)
-  sync()
-if (config.syncInterval)
-  setInterval(sync, config.syncInterval);
 
 async function listObjects(bucketName) {
 
@@ -335,9 +306,16 @@ async function getObject(bucketName, objectName, format) {
     return resultMessage
 }
 
-
+function checkQueryOptions() {
+  for (let option in config.queryOptions)
+    if (option != "simpleSearch" && config.queryOptions[option] === true)
+      return true
+  return false
+}
 
 async function insertInDBs(newObject, record, align) {
+  if(!checkQueryOptions())
+    return
   log("Insert in DBs ", record?.s3?.object?.key || record.name)
   let csv = false
   let jsonParsed, jsonStringified, postgreFinished, logCounterFlag
@@ -356,10 +334,7 @@ async function insertInDBs(newObject, record, align) {
     jsonParsed = newObject
   }
 
-  let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
-
   let queryName = record?.s3?.object?.key || record.name
-  let queryTable = createTable(table)
   let data = (jsonStringified || common.cleaned(newObject))
   if (typeof data != "string")
     data = JSON.stringify(data)
@@ -377,24 +352,70 @@ async function insertInDBs(newObject, record, align) {
   }
   log("Owner ", owner)
   record = { ...record, insertedBy: owner }
-  client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", async (err, res) => {
-    if (err) {
-      log("ERROR searching object in DB");
-      log(err);
 
-      client.query("CREATE TABLE " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)", (err, res) => {
+  if (config.queryOptions.SQLQuery) {
+    let table = common.urlEncode(record?.s3?.bucket?.name || record.bucketName)
+    //let queryTable = createTable(table)
+    client.query("SELECT * FROM " + table + " WHERE name = '" + queryName + "'", async (err, res) => {
+      if (err) {
+        log("ERROR searching object in DB");
+        log(err);
 
-        if (err) {
-          log("ERROR creating table");
-          log(err);
-          log("Query used :")
-          log("CREATE TABLE " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)")
-          postgreFinished = true
-          return;
+        client.query("CREATE TABLE " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)", (err, res) => {
+
+          if (err) {
+            log("ERROR creating table");
+            log(err);
+            log("Query used :")
+            log("CREATE TABLE " + table + " (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, data JSONB, record JSONB)")
+            postgreFinished = true
+            return;
+          }
+
+          client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}')`, (err, res) => {
+
+            if (err) {
+              log("ERROR inserting object in DB");
+              log(err);
+              postgreFinished = true
+              return;
+            }
+            log("Object inserted \n");
+            postgreFinished = true
+            return
+          });
+
+        });
+        while (!postgreFinished) { //TODO create a function for this
+          await sleep(delays)
+          if (!logCounterFlag) {
+            logCounterFlag = true
+            sleep(delays + 2000).then(resolve => {
+              if (!postgreFinished)
+                log("waiting for inserting object in postgre")
+              logCounterFlag = false
+            })
+          }
         }
-
-        client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}')`, (err, res) => {
-
+        if (postgreFinished)
+          return postgreFinished
+      }
+      if (res.rows[0]) {
+        log("Objects found ", res.rows.length, " ", JSON.stringify(res.rows[0]).substring(0, 100), "...")//, common.minify(res.rows));
+        client.query(`UPDATE ${table} SET data = '${data}', record = '${JSON.stringify(record)}'  WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
+          if (err) {
+            log("ERROR updating object in DB");
+            log(err);
+            postgreFinished = true
+            return;
+          }
+          postgreFinished = true
+          log("Object updated \n");
+          return
+        });
+      }
+      else
+        client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}' )`, (err, res) => {
           if (err) {
             log("ERROR inserting object in DB");
             log(err);
@@ -406,49 +427,8 @@ async function insertInDBs(newObject, record, align) {
           return
         });
 
-      });
-      while (!postgreFinished) { //TODO create a function for this
-        await sleep(delays)
-        if (!logCounterFlag) {
-          logCounterFlag = true
-          sleep(delays + 2000).then(resolve => {
-            if (!postgreFinished)
-              log("waiting for inserting object in postgre")
-            logCounterFlag = false
-          })
-        }
-      }
-      if (postgreFinished)
-        return postgreFinished
-    }
-    if (res.rows[0]) {
-      log("Objects found \n ")//, common.minify(res.rows));
-      client.query(`UPDATE ${table} SET data = '${data}', record = '${JSON.stringify(record)}'  WHERE name = '${record?.s3?.object?.key || record.name}'`, (err, res) => {
-        if (err) {
-          log("ERROR updating object in DB");
-          log(err);
-          postgreFinished = true
-          return;
-        }
-        postgreFinished = true
-        log("Object updated \n");
-        return
-      });
-    }
-    else
-      client.query(`INSERT INTO ${table} (name, data, record) VALUES ('${record?.s3?.object?.key || record.name}', '${data}', '${JSON.stringify(record)}' )`, (err, res) => {
-        if (err) {
-          log("ERROR inserting object in DB");
-          log(err);
-          postgreFinished = true
-          return;
-        }
-        log("Object inserted \n");
-        postgreFinished = true
-        return
-      });
-
-  });
+    });
+  }
 
   if ((!jsonParsed) || (jsonParsed && typeof jsonParsed != "object"))
     try {
@@ -510,7 +490,7 @@ async function insertInDBs(newObject, record, align) {
     catch (error) {
       logger.error(error)
     }
-  while (!postgreFinished) {
+  while (!postgreFinished && config.queryOptions.SQLQuery) {
     await sleep(delays)
     if (!logCounterFlag) {
       logCounterFlag = true
@@ -596,6 +576,23 @@ function getTypeRecursive(obj) {
           case "boolean": query = query + "BOOLEAN"; break;
         }
 }
+
+if (minioConfig.subscribe.all)
+  listBuckets().then((buckets) => {
+    let a = 1
+    for (let bucket of buckets) {
+      getNotifications(bucket.name.toString())
+      logger.debug("Subscribed bucket " + (a++) + " of " + buckets.length, "(", bucket.name, ")")
+    }
+  })
+else
+  for (let bucket of minioConfig.subscribe.buckets)
+    getNotifications(bucket)
+
+if (!config.doNotSyncAtStart)
+  sync()
+if (config.syncInterval)
+  setInterval(sync, config.syncInterval);
 
 module.exports = {
 

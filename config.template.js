@@ -57,4 +57,14 @@ module.exports = {
     publicKey: "",
     secret: "" // don't push it
   },
+  sourceConnectors: {
+    minioConnector: true,
+    apiConnector: true
+  },
+  queryOptions: {
+    simpleSearch: true,
+    advancedSearch: true,
+    SQLQuery: true,
+    graphQLQuery: true
+  }
 }
