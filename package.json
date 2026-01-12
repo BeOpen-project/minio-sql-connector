@@ -2,10 +2,10 @@
   "name": "sql",
   "version": "1.0.0",
   "description": "sql",
-  "main": "index.js",
+  "main": "suite.js",
   "scripts": {
     "test": "npm test",
-    "start": "nodemon index.js"
+    "start": "nodemon suite.js"
   },
   "repository": {
     "type": "git",
