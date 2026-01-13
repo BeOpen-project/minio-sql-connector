@@ -1,6 +1,6 @@
 const logger = require('percocologger')
 const log = logger.info
-const Datapoints = require("../../../Query-Engine/api/models/Datapoint")
+const Datapoints = require("../models/Datapoint")
 const config = require('../../config')
 const minioWriter = require("../../inputConnectors/minioConnector")
 const axios = require('axios')

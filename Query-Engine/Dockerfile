@@ -1,6 +1,6 @@
 FROM node:16-alpine
 WORKDIR /app
 COPY . . 
-COPY ../utils ../utils
+#COPY ../utils ../utils
 RUN npm install
 CMD ["node", "index"]

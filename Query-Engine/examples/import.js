@@ -1,7 +1,7 @@
 
 const mongoose = require("mongoose");
 const fs = require("fs");
-const common = require("../../utils/common")
+const common = require("../utils/common")
 const config = common.checkConfig(require('../config'), require('../config.template'))
 
 

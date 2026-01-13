@@ -1,6 +1,6 @@
 const axios = require('axios')
 const IORedis = require('ioredis')
-const common = require('../../../utils/common')
+const common = require('../../utils/common')
 const config = common.checkConfig(
   require('../../config'),
   require('../../config.template')

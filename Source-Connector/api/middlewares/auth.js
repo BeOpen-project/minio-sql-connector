@@ -6,7 +6,7 @@ const keycloakServerURL = authConfig.idmHost;
 const realm = authConfig.authRealm;
 const clientID = authConfig.clientId;
 const clientSecret = authConfig.secret;
-const { parseJwt } = require("../../../utils/common")
+const { parseJwt } = require("../../utils/common")
 const logger = require('percocologger')
 
 function deniedQuery(query, bucketName, prefix) {

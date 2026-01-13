@@ -1,7 +1,7 @@
 FROM node:16-alpine
 WORKDIR /app
 COPY ./Source-connector/api ./api
-COPY ./utils ./utils
+COPY ./Source-connector/utils ./utils
 COPY ./Source-connector/config*.js ./
 COPY ./Source-connector/index.js ./
 COPY ./Source-connector/package*.json ./
