@@ -1,5 +1,5 @@
 const Minio = require('minio')
-const common = require('../../utils/common.js')
+const common = require('../utils/common.js')
 const { sleep, getEntries, setType } = common
 const config = require('../config.js')
 const { minioConfig, delays, queryAllowedExtensions } = config
